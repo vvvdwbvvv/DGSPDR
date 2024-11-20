@@ -48,7 +48,7 @@ def main():
     else:
         print("Skipped Class Fetching")
     if args.teacher:
-        fetch_teacher(db,args
+        fetch_teacher(db,args)
     else:
         print("Skipped Teacher Fetching")
     if args.rate:
