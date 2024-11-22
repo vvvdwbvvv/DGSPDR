@@ -1,5 +1,3 @@
-# fetch_description.py
-
 from bs4 import BeautifulSoup
 import re
 import requests

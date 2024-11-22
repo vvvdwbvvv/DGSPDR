@@ -1,5 +1,3 @@
-# util.py
-
 from base64 import b64encode
 from pyDes import des, ECB, PAD_PKCS5
 from common import PERSON_API, TRACE_API, KEY

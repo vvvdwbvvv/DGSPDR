@@ -1,5 +1,3 @@
-# fetch_rate.py
-
 from bs4 import BeautifulSoup
 import requests
 import logging

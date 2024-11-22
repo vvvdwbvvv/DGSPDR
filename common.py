@@ -22,7 +22,6 @@ def load_config(filepath: str = "config.toml") -> dict:
 
 CONFIG = load_config()
 
-# 提取配置
 GENERAL = CONFIG.get("general", {})
 URLS = CONFIG.get("urls", {})
 RATE_QUERY = CONFIG.get("rate_query", "").split(",")
@@ -40,7 +39,6 @@ TEACHER_SCHM_BASE_URL = URLS.get("teacher_schm_base_url", "http://newdoc.nccu.ed
 
 YEAR_SEM = YEAR + SEM
 
-# 從 .env 讀取 KEY
 KEY = os.getenv("KEY") or ""
 
 def generate_teacher_stat_url(teacher_id: str, year_sem: str = YEAR_SEM) -> str:

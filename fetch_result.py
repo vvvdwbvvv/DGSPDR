@@ -3,7 +3,7 @@ import requests
 import os
 import json
 from tqdm import tqdm
-from constant import courseresult_csv, COURSERESULT_YEARSEM
+from common import courseresult_csv, COURSERESULT_YEARSEM
 
 
 def ensure_directory_exists(path: str):
@@ -66,7 +66,7 @@ def process_course(row, sem: str):
         print(f"Error processing course {course_id} in {sem}: {err}")
 
 
-def main():
+def fetch_result():
     for sem in COURSERESULT_YEARSEM:
         # Get total rows for progress tracking
         csv_file = f"./data/{courseresult_csv(sem)}"
@@ -80,7 +80,3 @@ def main():
             reader = tqdm(csv.reader(file), total=row_count, desc=f"Processing {sem}")
             for row in reader:
                 process_course(row, sem)
-
-
-if __name__ == "__main__":
-    main()

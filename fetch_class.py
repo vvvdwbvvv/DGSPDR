@@ -3,7 +3,6 @@ import tqdm
 import logging
 import datetime
 from time import sleep
-from fetch_description import fetch_description
 
 def fetch_classes(args, all_semesters, YEAR_SEM, db, fetch_description):
     """Fetches and processes course data based on the provided arguments.

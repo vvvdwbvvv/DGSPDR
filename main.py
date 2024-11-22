@@ -14,6 +14,8 @@ from tqdm import tqdm
 from fetch_class import fetch_classes
 from fetch_teacher import fetch_teacher
 from fetch_rate import fetch_rate
+from fetch_result import fetch_result
+import DB
 
 All_SEMESTERS =[
     "1011", "1012", "1021", "1022", "1031", "1032", "1041", "1042",
@@ -26,7 +28,8 @@ def setup_logging():
     logging.basicConfig(
         filename="log.log",
         format="%(asctime)s [%(levelname)s] %(message)s",
-        encoding="utf-8",
+        encoding="utf-8"
+    )
 
 def setup_parser():
     """Set up arg parser"""
