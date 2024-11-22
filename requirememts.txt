@@ -1,0 +1,6 @@
+requests
+beautifulsoup4
+tqdm
+toml
+python-dotenv
+pyDes

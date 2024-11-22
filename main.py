@@ -11,8 +11,9 @@ import requests
 from bs4 import BeautifulSoup
 from tqdm import tqdm
 
-from fetch_description import fetch_description
 from fetch_class import fetch_classes
+from fetch_teacher import fetch_teacher
+from fetch_rate import fetch_rate
 
 All_SEMESTERS =[
     "1011", "1012", "1021", "1022", "1031", "1032", "1041", "1042",

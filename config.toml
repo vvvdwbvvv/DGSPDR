@@ -1,0 +1,18 @@
+# config.toml
+
+[general]
+year = "2023"
+sem = "1"
+
+[urls]
+server_url = "http://es.nccu.edu.tw/"
+sem_api = "semester/"
+person_api = "person/"
+course_api = "course/"
+trace_api = "tracing/"
+teacher_schm_base_url = "http://newdoc.nccu.edu.tw/teaschm/"
+
+rate_query = "query1,query2,query3"
+
+[course_results]
+years = ["1102", "1111", "1112", "1121"]

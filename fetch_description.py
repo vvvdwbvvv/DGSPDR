@@ -1,10 +1,11 @@
+# fetch_description.py
+
 from bs4 import BeautifulSoup
 import re
 import requests
 import logging
 
-
-def fetch_description(course_id: str):
+def fetch_description(course_id: str) -> dict:
     """Fetches the description and objectives of a course based on its ID.
 
     Args:
@@ -20,6 +21,7 @@ def fetch_description(course_id: str):
         "description": [],
         "objectives": [],
         "qrysub": {},
+        "qrysubEn": {}
     }
 
     try:
@@ -40,13 +42,16 @@ def fetch_description(course_id: str):
         result["qrysubEn"] = course_details_en[0]
 
         # Get the teacher scheme URL and normalize the protocol
-        location = str(result["qrysub"]["teaSchmUrl"]).replace("https://", "http://")
+        location = str(result["qrysub"].get("teaSchmUrl", "")).replace("https://", "http://")
+
+        if not location:
+            raise ValueError("No teacher scheme URL found.")
 
         # Fetch the teacher's page content
         response = requests.get(location)
         response.raise_for_status()
         soup = BeautifulSoup(response.content, "html.parser")
-        is_old_system = soup.find("title").text == "教師資訊整合系統"
+        is_old_system = soup.find("title").text.strip() == "教師資訊整合系統"
 
         if is_old_system:
             # Parse the old system format
@@ -56,27 +61,33 @@ def fetch_description(course_id: str):
             parse_new_system(soup, result)
 
     except Exception as e:
-        logging.error(f"Error fetching course details for {course_id}")
-        logging.error(e)
+        logging.error(f"Error fetching course details for {course_id}: {e}")
 
     return result
 
 
-def parse_old_system(soup, result):
+def parse_old_system(soup: BeautifulSoup, result: dict):
     """Parses the old system's format for course details."""
     try:
         contents = soup.find("div", {"class": "accordionPart"}).find_all("span")
+        if len(contents) < 2:
+            raise ValueError("Insufficient content in old system format.")
         parse_content(contents[0].find("div", {"class": "qa_content"}), result["description"])
         parse_content(contents[1].find("div", {"class": "qa_content"}), result["objectives"])
-    except AttributeError:
-        logging.error("Error parsing old system format.")
+    except AttributeError as e:
+        logging.error(f"Error parsing old system format: {e}")
+    except ValueError as e:
+        logging.error(f"Parsing error: {e}")
 
 
-def parse_new_system(soup, result):
+def parse_new_system(soup: BeautifulSoup, result: dict):
     """Parses the new system's format for course details."""
     try:
         # Parse syllabus description
-        description_title = soup.find("div", {"class": "col-sm-7 sylview--mtop col-p-6"}).find("h2", {"class": "text-primary"})
+        description_section = soup.find("div", {"class": "col-sm-7 sylview--mtop col-p-6"})
+        if not description_section:
+            raise ValueError("Description section not found in new system format.")
+        description_title = description_section.find("h2", {"class": "text-primary"})
         descriptions = description_title.find_next_siblings(True)
         for description in descriptions:
             if description.attrs and description.attrs.get("class") == ["row", "sylview-mtop", "fa-border"]:
@@ -86,11 +97,13 @@ def parse_new_system(soup, result):
         # Parse syllabus objectives
         objectives_section = soup.find("div", {"class": "container sylview-section"}).select_one(".col-p-8")
         parse_content(objectives_section, result["objectives"])
-    except AttributeError:
-        logging.error("Error parsing new system format.")
+    except AttributeError as e:
+        logging.error(f"Error parsing new system format: {e}")
+    except ValueError as e:
+        logging.error(f"Parsing error: {e}")
 
 
-def parse_content(content, target_list):
+def parse_content(content, target_list: list):
     """Parses and cleans content, appending results to a target list."""
     if not content:
         return
@@ -100,8 +113,8 @@ def parse_content(content, target_list):
 
 if __name__ == "__main__":
     logging.basicConfig(
-        filename="fetch_description.log",
-        level=logging.ERROR,
+        filename="logs/fetch_description.log",
+        level=logging.INFO,
         format="%(asctime)s [%(levelname)s] %(message)s",
         encoding="utf-8",
     )
