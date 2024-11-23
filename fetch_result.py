@@ -3,7 +3,8 @@ import requests
 import os
 import json
 from tqdm import tqdm
-from common import courseresult_csv, COURSERESULT_YEARSEM
+
+import common
 
 
 def ensure_directory_exists(path: str):
@@ -67,7 +68,10 @@ def process_course(row, sem: str):
 
 
 def fetch_result():
-    for sem in COURSERESULT_YEARSEM:
+    courseresult_yearsem = common.COURSERESULT_YEARSEM
+    courseresult_csv = common.courseresult_csv
+
+    for sem in courseresult_yearsem:
         # Get total rows for progress tracking
         csv_file = f"./data/{courseresult_csv(sem)}"
         try:

@@ -3,6 +3,7 @@
 [general]
 year = "2023"
 sem = "1"
+db = "database.db"
 
 [urls]
 server_url = "http://es.nccu.edu.tw/"

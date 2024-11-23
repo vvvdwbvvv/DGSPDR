@@ -3,7 +3,9 @@ import requests
 import tqdm
 from bs4 import BeautifulSoup
 from time import sleep
+import datetime
 
+import common
 
 def delete_existing_tracks(user, courses):
     """Delete existing courses"""
@@ -23,7 +25,7 @@ def delete_existing_tracks(user, courses):
 
 
 def add_courses_to_track(user, coursesList):
-    """track added"""
+    """Add courses to track"""
     tqdmCourses = tqdm.tqdm([*set(coursesList)], leave=False, desc="Adding to Tracks")
     for courseId in tqdmCourses:
         try:
@@ -35,7 +37,7 @@ def add_courses_to_track(user, coursesList):
             continue
 
 
-def parse_teacher_ids(courses, year_sem, db):
+def parse_teacher_ids(courses, db):
     """Parse id and save to db"""
     teacherIdDict = {}
     tqdmCourses = tqdm.tqdm(courses, leave=False, desc="Parsing Teacher IDs")
@@ -46,12 +48,12 @@ def parse_teacher_ids(courses, year_sem, db):
             teacherName = str(course["teaNam"])
             tqdmCourses.set_postfix_str(f"Processing {teacherName}")
 
-            if teacherStatUrl.startswith(f"https://newdoc.nccu.edu.tw/teaschm/{year_sem}/statisticAll.jsp"):
-                teacherId = teacherStatUrl.split(f"/statisticAll.jsp-tnum=")[1].split(".htm")[0]
+            if teacherStatUrl.startswith(f"https://newdoc.nccu.edu.tw/teaschm/{common.YEAR_SEM}/statisticAll.jsp"):
+                teacherId = teacherStatUrl.split("/statisticAll.jsp-tnum=")[1].split(".htm")[0]
                 teacherIdDict[teacherName] = teacherId
                 db.add_teacher(teacherId, teacherName)
 
-            elif teacherStatUrl.startswith(f"https://newdoc.nccu.edu.tw/teaschm/{year_sem}/set20.jsp"):
+            elif teacherStatUrl.startswith(f"https://newdoc.nccu.edu.tw/teaschm/{common.YEAR_SEM}/set20.jsp"):
                 res = requests.get(
                     teacherStatUrl.replace("newdoc.nccu.edu.tw", "140.119.229.20").replace("https://", "http://"),
                     timeout=10,
@@ -73,21 +75,36 @@ def parse_teacher_ids(courses, year_sem, db):
     return teacherIdDict
 
 
-def fetch_teacher(args, db, user, year_sem):
-    if not args.teacher:
+def fetch_teacher(db, user, args):
+    """Fetches and processes teacher data based on the provided arguments.
+
+    Args:
+        db: Database instance.
+        user: User instance.
+        args: Command-line arguments.
+    """
+    if args.command not in ["teacher", "all"]:
         print("Skipping Fetch TeacherId")
         return
 
-    coursesList = db.get_this_semester_course(YEAR, SEM)
+    try:
+        year = common.YEAR
+        sem = common.SEM
 
-    existingCourses = user.get_track()
-    delete_existing_tracks(user, existingCourses)
+        coursesList = db.get_this_semester_course(year, sem)
 
-    add_courses_to_track(user, coursesList)
+        existingCourses = user.get_track()
+        delete_existing_tracks(user, existingCourses)
 
-    trackedCourses = user.get_track()
-    teacherIdDict = parse_teacher_ids(trackedCourses, year_sem, db)
+        add_courses_to_track(user, coursesList)
 
-    delete_existing_tracks(user, trackedCourses)
+        trackedCourses = user.get_track()
 
-    print(f"Fetch TeacherId done at {datetime.datetime.now()}")
+        teacherIdDict = parse_teacher_ids(trackedCourses, db)
+
+        delete_existing_tracks(user, trackedCourses)
+
+        print(f"Fetch TeacherId done at {datetime.datetime.now()}")
+
+    except Exception as e:
+        logging.error(f"Error fetching teachers: {e}")

@@ -4,22 +4,22 @@ import logging
 import datetime
 from time import sleep
 
-def fetch_classes(args, all_semesters, YEAR_SEM, db, fetch_description):
+import common
+from fetch_description import fetch_description
+
+def fetch_classes(db, args):
     """Fetches and processes course data based on the provided arguments.
 
     Args:
-        args: Command-line arguments containing options like `course` and `fast`.
-        all_semesters: List of semesters to fetch courses for.
-        YEAR_SEM: The current semester identifier.
         db: Database instance to store course data.
-        fetch_description: Function to fetch detailed course descriptions.
+        args: Command-line arguments containing options like `course` and `fast`.
     """
-    if not args.course:
+    if not args.command in ["course", "all"]:
         print("Skipping Fetch Class")
         return
 
     try:
-        #Identify units and categories
+        # Identify units and categories
         response = requests.get("https://qrysub.nccu.edu.tw/assets/api/unit.json")
         response.raise_for_status()
         units = response.json()
@@ -32,20 +32,21 @@ def fetch_classes(args, all_semesters, YEAR_SEM, db, fetch_description):
             for dp3 in dp2["utL3"] if dp3["utCodL3"] != "0"
         ]
 
-        #Fetch courses
+        # Fetch courses
         courses_list = []
         tqdm_categories = tqdm.tqdm(categories, leave=False, desc="Processing Categories")
 
         for category in tqdm_categories:
             tqdm_categories.set_postfix_str(f"Category: {category}")
 
-            semesters = [all_semesters[-1]] if args.fast else tqdm.tqdm(all_semesters, leave=False, desc="Processing Semesters")
+            # 使用 fast 模式只抓取最新學期
+            semesters = [common.YEAR_SEM] if args.fast else tqdm.tqdm(common.All_SEMESTERS, leave=False, desc="Processing Semesters")
 
             for semester in semesters:
-                if not args.fast:
+                if not args.fast and isinstance(semesters, tqdm.tqdm):
                     semesters.set_postfix_str(f"Processing: {semester}")
                 try:
-                    sleep(0.1)
+                    sleep(args.delay)
                     url = f"https://es.nccu.edu.tw/course/zh-TW/:sem={semester} :dp1={category['dp1']} :dp2={category['dp2']} :dp3={category['dp3']}"
                     response = requests.get(url)
                     response.raise_for_status()
@@ -55,13 +56,13 @@ def fetch_classes(args, all_semesters, YEAR_SEM, db, fetch_description):
                         raise ValueError(f"Category {category} too large to process.")
 
                     # Add current semester courses to courses_list
-                    if semester == YEAR_SEM:
+                    if semester == common.YEAR_SEM:
                         courses_list += [course["subNum"] for course in courses]
 
                     # Write courses to the database
                     for course in tqdm.tqdm(courses, leave=False, desc="Processing Courses"):
                         course_id = f"{semester}{course['subNum']}"
-                        # Uncomment the next line if database check is needed
+                        # 如果需要，取消註解以下行以檢查課程是否已存在
                         # if db.isCourseExist(course_id, category):
                         #     continue
                         details = fetch_description(course_id)

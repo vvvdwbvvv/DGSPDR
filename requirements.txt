@@ -1,6 +1,5 @@
 requests
-beautifulsoup4
 tqdm
-toml
+beautifulsoup4
 python-dotenv
-pyDes
+toml

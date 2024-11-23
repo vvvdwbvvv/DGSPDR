@@ -29,6 +29,11 @@ COURSERESULT_YEARSEM = CONFIG.get("course_results", {}).get("years", [])
 
 YEAR = GENERAL.get("year", "")
 SEM = GENERAL.get("sem", "")
+All_SEMESTERS =[
+    "1011", "1012", "1021", "1022", "1031", "1032", "1041", "1042",
+    "1051", "1052", "1061", "1062", "1071", "1072", "1081", "1082",
+    "1091", "1092", "1101", "1102", "1111", "1112", "1121", "1122", "1131"
+]
 
 SERVER_URL = URLS.get("server_url", "http://es.nccu.edu.tw/")
 SEM_API = f"{SERVER_URL}{URLS.get('sem_api', '')}"
@@ -46,7 +51,7 @@ def generate_teacher_stat_url(teacher_id: str, year_sem: str = YEAR_SEM) -> str:
 
     Args:
         teacher_id (str): 教師 ID。
-        year_sem (str, optional): 學年度學期標識，默認使用配置中的 YEAR + SEM。
+        year_sem (str, optional): 學年度學期標識，預設使用配置中的 YEAR + SEM。
 
     Returns:
         str: 統計頁面 URL。
@@ -59,7 +64,7 @@ def generate_course_rate_url(param: str, year_sem: str = YEAR_SEM) -> str:
 
     Args:
         param (str): 特定參數。
-        year_sem (str, optional): 學年度學期標識，默認使用配置中的 YEAR + SEM。
+        year_sem (str, optional): 學年度學期標識，預設使用配置中的 YEAR + SEM。
 
     Returns:
         str: 課程評分頁面 URL。
