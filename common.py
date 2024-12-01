@@ -4,6 +4,9 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+USERNAME = os.getenv("USERNAME") or ""
+PASSWORD = os.getenv("PASSWORD") or ""
+
 def load_config(filepath: str = "config.toml") -> dict:
     """讀取 TOML 配置文件。
 
@@ -20,7 +23,7 @@ def load_config(filepath: str = "config.toml") -> dict:
         return toml.load(file)
 
 
-CONFIG = load_config()
+CONFIG = load_config("config.toml")
 
 GENERAL = CONFIG.get("general", {})
 URLS = CONFIG.get("urls", {})
@@ -29,6 +32,9 @@ COURSERESULT_YEARSEM = CONFIG.get("course_results", {}).get("years", [])
 
 YEAR = GENERAL.get("year", "")
 SEM = GENERAL.get("sem", "")
+YEAR_SEM = f"{YEAR}{SEM}"
+COURSERESULT_YEARSEM = ["1102", "1111", "1112", "1121"]
+KEY = "angu1arjjlST@2019"
 All_SEMESTERS =[
     "1011", "1012", "1021", "1022", "1031", "1032", "1041", "1042",
     "1051", "1052", "1061", "1062", "1071", "1072", "1081", "1082",
@@ -42,9 +48,6 @@ COURSE_API = f"{SERVER_URL}{URLS.get('course_api', '')}"
 TRACE_API = f"{SERVER_URL}{URLS.get('trace_api', '')}"
 TEACHER_SCHM_BASE_URL = URLS.get("teacher_schm_base_url", "http://newdoc.nccu.edu.tw/teaschm/")
 
-YEAR_SEM = YEAR + SEM
-
-KEY = os.getenv("KEY") or ""
 
 def generate_teacher_stat_url(teacher_id: str, year_sem: str = YEAR_SEM) -> str:
     """生成教師統計頁面的 URL。
@@ -70,7 +73,6 @@ def generate_course_rate_url(param: str, year_sem: str = YEAR_SEM) -> str:
         str: 課程評分頁面 URL。
     """
     return f"{TEACHER_SCHM_BASE_URL}{year_sem}/{param}"
-
 
 def courseresult_csv(sem: str) -> str:
     """生成課程結果的 CSV 文件名。

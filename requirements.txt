@@ -3,3 +3,4 @@ tqdm
 beautifulsoup4
 python-dotenv
 toml
+pyDes

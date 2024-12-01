@@ -174,5 +174,5 @@ class DB:
         return response[0] > 0
 
 if __name__ == "__main__":
-    db = DB("test.db")
+    db = DB("database.db")
     print(db.get_this_semester_course("111", "2"))

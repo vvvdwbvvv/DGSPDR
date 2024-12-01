@@ -3,20 +3,10 @@ from pyDes import des, ECB, PAD_PKCS5
 from common import PERSON_API, TRACE_API, KEY
 import logging
 
-def des_ecb_encode(source: str, key: str) -> str:
-    """使用 DES ECB 模式加密並進行 Base64 編碼。
-
-    Args:
-        source (str): 要加密的原始字符串。
-        key (str): DES 加密的密鑰，必須為 8 個字元。
-
-    Returns:
-        str: 加密後並進行 Base64 編碼的字符串。
-    """
-    if len(key) != 8:
-        raise ValueError("DES key must be exactly 8 characters long.")
-
-    des_obj = des(key, ECB, pad=None, padmode=PAD_PKCS5)
+def des_ecb_encode(source, key):
+    """DES ECB 模式加密並進行 Base64 編碼"""
+    des_obj = des("........", ECB, IV=None, pad=None, padmode=PAD_PKCS5)
+    des_obj.setKey(key)
     des_result = des_obj.encrypt(source)
     return b64encode(des_result).decode()
 

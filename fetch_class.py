@@ -14,7 +14,7 @@ def fetch_classes(db, args):
         db: Database instance to store course data.
         args: Command-line arguments containing options like `course` and `fast`.
     """
-    if not args.command in ["course", "all"]:
+    if args.command not in ["course", "all"]:
         print("Skipping Fetch Class")
         return
 
