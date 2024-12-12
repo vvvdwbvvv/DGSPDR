@@ -1,0 +1,11 @@
+name: PR notifier
+
+on:
+  pull_request:
+    types: [ opened, reopened ]
+
+jobs:
+  pr_notifier:
+    uses: OpenNCCU/ci-cd/.github/workflows/pr_notifier.yml@main
+    secrets:
+      WEBHOOK_URL: ${{ secrets.WEBHOOK_URL }}
