@@ -17,6 +17,8 @@ class SCSRSQLitePipeline:
         self.cur.execute("PRAGMA journal_mode = WAL")
         self.cur.execute("PRAGMA synchronous = NORMAL")
 
+        self.create_tables()
+
     def close_spider(self, spider):
         self.conn.commit()
         self.conn.close()
@@ -33,6 +35,121 @@ class SCSRSQLitePipeline:
         else:
             raise DropItem(f"unknown item type: {type(item)}")
         return item
+
+    def create_tables(self):
+        """Create database tables if they don't exist."""
+
+        # Create teacher table
+        self.cur.execute("""
+        CREATE TABLE IF NOT EXISTS teacher (
+            id TEXT PRIMARY KEY,
+            name TEXT,
+            name_en TEXT,
+            department TEXT,
+            first_appear TEXT
+        )
+        """)
+
+        # Create course table
+        self.cur.execute("""
+        CREATE TABLE IF NOT EXISTS course (
+            id TEXT PRIMARY KEY,
+            year TEXT,
+            semester TEXT,
+            sub_num TEXT,
+            name TEXT,
+            name_en TEXT,
+            teacher_id TEXT REFERENCES teacher(id),
+            kind TEXT,
+            time TEXT,
+            lang TEXT,
+            lang_en TEXT,
+            sem_qty TEXT,
+            sem_qty_en TEXT,
+            classroom_id TEXT,
+            unit TEXT,
+            unit_en TEXT,
+            college TEXT,
+            degree TEXT,
+            department TEXT,
+            credit INTEGER,
+            transition_type TEXT,
+            transition_type_en TEXT,
+            info TEXT,
+            info_en TEXT,
+            note TEXT,
+            note_en TEXT,
+            syllabus TEXT,
+            syllabus_en TEXT,
+            objective TEXT,
+            objective_en TEXT,
+            core BOOLEAN,
+            discipline TEXT,
+            last_enroll INTEGER,
+            student_limit INTEGER,
+            student_count INTEGER
+        )
+        """)
+
+        # Create course_remain table
+        self.cur.execute("""
+        CREATE TABLE IF NOT EXISTS course_remain (
+            course_id TEXT PRIMARY KEY REFERENCES course(id),
+            signable BOOLEAN,
+            waiting_count INTEGER,
+            origin_maximum INTEGER,
+            origin_registered INTEGER,
+            origin_remained INTEGER,
+            all_maximum INTEGER,
+            all_registered INTEGER,
+            all_remained INTEGER,
+            other_dept_maximum INTEGER,
+            other_dept_registered INTEGER,
+            other_dept_remained INTEGER,
+            same_grade_maximum INTEGER,
+            same_grade_registered INTEGER,
+            same_grade_remained INTEGER,
+            diff_grade_maximum INTEGER,
+            diff_grade_registered INTEGER,
+            diff_grade_remained INTEGER,
+            minor_maximum INTEGER,
+            minor_registered INTEGER,
+            minor_remained INTEGER,
+            double_major_maximum INTEGER,
+            double_major_registered INTEGER,
+            double_major_remained INTEGER,
+            other_dept_in_college_maximum INTEGER,
+            other_dept_in_college_registered INTEGER,
+            other_dept_in_college_remained INTEGER,
+            other_college_maximum INTEGER,
+            other_college_registered INTEGER,
+            other_college_remained INTEGER,
+            program_maximum INTEGER,
+            program_registered INTEGER,
+            program_remained INTEGER,
+            same_grade_and_above_maximum INTEGER,
+            same_grade_and_above_registered INTEGER,
+            same_grade_and_above_remained INTEGER,
+            lower_grade_maximum INTEGER,
+            lower_grade_registered INTEGER,
+            lower_grade_remained INTEGER,
+            other_program_maximum INTEGER,
+            other_program_registered INTEGER,
+            other_program_remained INTEGER
+        )
+        """)
+
+        # Create rate table (if needed)
+        self.cur.execute("""
+        CREATE TABLE IF NOT EXISTS rate (
+            course_id TEXT REFERENCES course(id),
+            teacher_id TEXT REFERENCES teacher(id),
+            content TEXT,
+            content_en TEXT
+        )
+        """)
+
+        self.conn.commit()
 
     def upsert_teacher(self, i):
         sql = """
