@@ -143,6 +143,8 @@ logs/
 # Other files to ignore
 *.sqlite3
 *.db
+data.db-shm
+data.db-wal
 
 # Specific to your project
 result/
