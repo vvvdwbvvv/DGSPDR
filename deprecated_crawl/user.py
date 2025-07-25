@@ -6,6 +6,7 @@ import logging
 
 load_dotenv()
 
+
 class User:
     _username: str
     _password: str

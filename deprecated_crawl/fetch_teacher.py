@@ -7,6 +7,7 @@ import datetime
 
 import common
 
+
 def delete_existing_tracks(user, courses):
     """Delete existing courses"""
     if not courses:
@@ -48,23 +49,40 @@ def parse_teacher_ids(courses, db):
             teacherName = str(course["teaNam"])
             tqdmCourses.set_postfix_str(f"Processing {teacherName}")
 
-            if teacherStatUrl.startswith(f"https://newdoc.nccu.edu.tw/teaschm/{common.YEAR_SEM}/statisticAll.jsp"):
-                teacherId = teacherStatUrl.split("/statisticAll.jsp-tnum=")[1].split(".htm")[0]
+            if teacherStatUrl.startswith(
+                f"https://newdoc.nccu.edu.tw/teaschm/{common.YEAR_SEM}/statisticAll.jsp"
+            ):
+                teacherId = teacherStatUrl.split("/statisticAll.jsp-tnum=")[1].split(
+                    ".htm"
+                )[0]
                 teacherIdDict[teacherName] = teacherId
                 db.add_teacher(teacherId, teacherName)
 
-            elif teacherStatUrl.startswith(f"https://newdoc.nccu.edu.tw/teaschm/{common.YEAR_SEM}/set20.jsp"):
+            elif teacherStatUrl.startswith(
+                f"https://newdoc.nccu.edu.tw/teaschm/{common.YEAR_SEM}/set20.jsp"
+            ):
                 res = requests.get(
-                    teacherStatUrl.replace("newdoc.nccu.edu.tw", "140.119.229.20").replace("https://", "http://"),
+                    teacherStatUrl.replace(
+                        "newdoc.nccu.edu.tw", "140.119.229.20"
+                    ).replace("https://", "http://"),
                     timeout=10,
                 )
                 res.raise_for_status()
                 sleep(0.2)
-                soup = BeautifulSoup(res.content.decode("big5").encode("utf-8"), "html.parser")
+                soup = BeautifulSoup(
+                    res.content.decode("big5").encode("utf-8"), "html.parser"
+                )
                 rows = soup.find_all("tr")
-                for row in (x.find_all("td") for x in rows if x.find_all("td")[1].find("a")):
+                for row in (
+                    x.find_all("td") for x in rows if x.find_all("td")[1].find("a")
+                ):
                     teacherName = str(row[0].text)
-                    teacherId = row[-1].find("a")["href"].split("statisticAll.jsp-tnum=")[1].split(".htm")[0]
+                    teacherId = (
+                        row[-1]
+                        .find("a")["href"]
+                        .split("statisticAll.jsp-tnum=")[1]
+                        .split(".htm")[0]
+                    )
                     teacherIdDict[teacherName] = teacherId
                     db.add_teacher(teacherId, teacherName)
 

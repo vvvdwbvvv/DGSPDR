@@ -3,6 +3,7 @@ import re
 import requests
 import logging
 
+
 def fetch_description(course_id: str) -> dict:
     """Fetches the description and objectives of a course based on its ID.
 
@@ -15,12 +16,7 @@ def fetch_description(course_id: str) -> dict:
     if len(course_id) != 13:
         raise ValueError("Wrong courseId format. It must be 13 characters.")
 
-    result = {
-        "description": [],
-        "objectives": [],
-        "qrysub": {},
-        "qrysubEn": {}
-    }
+    result = {"description": [], "objectives": [], "qrysub": {}, "qrysubEn": {}}
 
     try:
         # Fetch course details in Chinese
@@ -40,7 +36,9 @@ def fetch_description(course_id: str) -> dict:
         result["qrysubEn"] = course_details_en[0]
 
         # Get the teacher scheme URL and normalize the protocol
-        location = str(result["qrysub"].get("teaSchmUrl", "")).replace("https://", "http://")
+        location = str(result["qrysub"].get("teaSchmUrl", "")).replace(
+            "https://", "http://"
+        )
 
         if not location:
             raise ValueError("No teacher scheme URL found.")
@@ -70,8 +68,12 @@ def parse_old_system(soup: BeautifulSoup, result: dict):
         contents = soup.find("div", {"class": "accordionPart"}).find_all("span")
         if len(contents) < 2:
             raise ValueError("Insufficient content in old system format.")
-        parse_content(contents[0].find("div", {"class": "qa_content"}), result["description"])
-        parse_content(contents[1].find("div", {"class": "qa_content"}), result["objectives"])
+        parse_content(
+            contents[0].find("div", {"class": "qa_content"}), result["description"]
+        )
+        parse_content(
+            contents[1].find("div", {"class": "qa_content"}), result["objectives"]
+        )
     except AttributeError as e:
         logging.error(f"Error parsing old system format: {e}")
     except ValueError as e:
@@ -82,18 +84,26 @@ def parse_new_system(soup: BeautifulSoup, result: dict):
     """Parses the new system's format for course details."""
     try:
         # Parse syllabus description
-        description_section = soup.find("div", {"class": "col-sm-7 sylview--mtop col-p-6"})
+        description_section = soup.find(
+            "div", {"class": "col-sm-7 sylview--mtop col-p-6"}
+        )
         if not description_section:
             raise ValueError("Description section not found in new system format.")
         description_title = description_section.find("h2", {"class": "text-primary"})
         descriptions = description_title.find_next_siblings(True)
         for description in descriptions:
-            if description.attrs and description.attrs.get("class") == ["row", "sylview-mtop", "fa-border"]:
+            if description.attrs and description.attrs.get("class") == [
+                "row",
+                "sylview-mtop",
+                "fa-border",
+            ]:
                 break
             parse_content(description, result["description"])
 
         # Parse syllabus objectives
-        objectives_section = soup.find("div", {"class": "container sylview-section"}).select_one(".col-p-8")
+        objectives_section = soup.find(
+            "div", {"class": "container sylview-section"}
+        ).select_one(".col-p-8")
         parse_content(objectives_section, result["objectives"])
     except AttributeError as e:
         logging.error(f"Error parsing new system format: {e}")
@@ -105,7 +115,9 @@ def parse_content(content, target_list: list):
     """Parses and cleans content, appending results to a target list."""
     if not content:
         return
-    for line in [x for x in re.split(r'[\n\r]+', content.get_text(strip=True)) if x.strip()]:
+    for line in [
+        x for x in re.split(r"[\n\r]+", content.get_text(strip=True)) if x.strip()
+    ]:
         target_list.append(line)
 
 

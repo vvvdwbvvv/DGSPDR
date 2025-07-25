@@ -5,6 +5,7 @@ from unittest.mock import Mock
 from time import sleep
 import tqdm
 
+
 # 模擬 DB 類
 class MockDB:
     def __init__(self, db_path):
@@ -12,10 +13,14 @@ class MockDB:
 
     def get_this_semester_course(self, year, sem):
         # 模擬返回課程清單
-        return [{"course_id": "101", "subNum": "C101"}, {"course_id": "102", "subNum": "C102"}]
+        return [
+            {"course_id": "101", "subNum": "C101"},
+            {"course_id": "102", "subNum": "C102"},
+        ]
 
     def add_teacher(self, teacher_id, teacher_name):
         logging.info(f"Teacher added to DB: {teacher_name} ({teacher_id})")
+
 
 # 模擬 User 類
 class MockUser:
@@ -33,6 +38,7 @@ class MockUser:
     def add_track(self, course_id):
         logging.info(f"Added track: {course_id}")
         self.tracks.append({"subNum": course_id})
+
 
 # 模擬 fetch_teacher 函數
 def fetch_teacher(db, user, args):
@@ -65,13 +71,14 @@ def fetch_teacher(db, user, args):
 
     logging.info("Fetch TeacherId done.")
 
+
 # 測試運行的主函數
 def main():
     # 配置日誌
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s [%(levelname)s] %(message)s",
-        handlers=[logging.StreamHandler(sys.stdout)]
+        handlers=[logging.StreamHandler(sys.stdout)],
     )
 
     # 初始化模擬對象
@@ -83,6 +90,7 @@ def main():
 
     # 測試 fetch_teacher 函數
     fetch_teacher(db, user, args)
+
 
 # 運行主函數進行測試
 main()

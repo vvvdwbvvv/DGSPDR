@@ -3,6 +3,7 @@ from pyDes import des, ECB, PAD_PKCS5
 from common import PERSON_API, TRACE_API, KEY
 import logging
 
+
 def des_ecb_encode(source, key):
     """DES ECB 模式加密並進行 Base64 編碼"""
     des_obj = des("........", ECB, IV=None, pad=None, padmode=PAD_PKCS5)

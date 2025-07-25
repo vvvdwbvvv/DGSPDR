@@ -27,6 +27,7 @@ def save_json(filepath: str, data: list):
     with open(filepath, "w") as file:
         json.dump(data, file)
 
+
 def process_course(row, sem: str):
     """Process a single course entry."""
     course_id = str(row[0])

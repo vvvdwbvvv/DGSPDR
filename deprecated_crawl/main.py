@@ -2,7 +2,6 @@ import argparse
 import logging
 import os
 import sys
-from time import sleep
 
 from fetch_class import fetch_classes
 from fetch_teacher import fetch_teacher
@@ -19,7 +18,7 @@ def setup_logging():
         filename="log.log",
         level=logging.INFO,
         format="%(asctime)s [%(levelname)s] %(message)s",
-        encoding="utf-8"
+        encoding="utf-8",
     )
 
 
@@ -31,35 +30,32 @@ def setup_parser():
         "--db",
         type=str,
         default="database.db",
-        help="指定資料庫檔案路徑 (預設: database.db)"
+        help="指定資料庫檔案路徑 (預設: database.db)",
     )
     parent_parser.add_argument(
         "--semester",
         type=str,
         choices=common.All_SEMESTERS,
-        nargs='*',
+        nargs="*",
         default=common.All_SEMESTERS,
-        help="指定要抓取的學期 (預設: ALL)"
+        help="指定要抓取的學期 (預設: ALL)",
     )
     parent_parser.add_argument(
         "--delay",
         type=float,
         default=1.0,
-        help="每次請求之間的延遲時間（秒） (預設: 1.0)"
+        help="每次請求之間的延遲時間（秒） (預設: 1.0)",
     )
 
     # 主解析器
-    parser = argparse.ArgumentParser(
-        description="爬蟲主程式",
-        parents=[parent_parser]
-    )
+    parser = argparse.ArgumentParser(description="爬蟲主程式", parents=[parent_parser])
 
     # 子命令解析器
     subparsers = parser.add_subparsers(
         title="子命令",
         description="可用的功能命令",
         help="選擇需要執行的任務",
-        dest="command"
+        dest="command",
     )
 
     # 定義子命令，繼承全局參數
@@ -77,6 +73,7 @@ def create_data_directory():
     os.makedirs(dir_path, exist_ok=True)
     logging.info(f"Data directory ensured at {dir_path}")
 
+
 def fetch_data(db, args):
     """Handle data fetching based on the command."""
     user = User()
@@ -89,8 +86,8 @@ def fetch_data(db, args):
             fetch_classes(db, args),
             fetch_teacher(db, user, args),
             fetch_rate(db, args),
-            fetch_result(db, args)
-        )
+            fetch_result(db, args),
+        ),
     }
 
     fetch_func = command_map.get(args.command)
@@ -101,6 +98,7 @@ def fetch_data(db, args):
         logging.error(f"Unknown subcommand: {args.command}")
         print(f"Unknown subcommand: {args.command}")
         sys.exit(1)
+
 
 def main():
     setup_logging()
@@ -116,6 +114,7 @@ def main():
         logging.error(f"An error occurred: {e}", exc_info=True)
         print(f"Program terminated due to an error: {e}")
         sys.exit(1)
+
 
 if __name__ == "__main__":
     main()

@@ -2,6 +2,7 @@ from bs4 import BeautifulSoup
 import requests
 import logging
 
+
 def fetch_rate(url: str) -> list[str]:
     """
     Fetch rates from a specific URL.
