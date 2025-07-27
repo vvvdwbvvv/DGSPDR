@@ -80,6 +80,9 @@ class CoursesSpider(scrapy.Spider):
             f":sem={sem}%20:dp1={dp1}%20:dp2={dp2}%20:dp3={dp3}"  # ex: https://es.nccu.edu.tw/course/zh-TW/:sem=1131%20:dp1=01%20:dp2=A1%20:dp3=105%20/
         )
 
+    def process_course_item(self, item, course_data):
+        yield item
+
     def parse_course_list(self, response, semester, dp1, dp2, dp3):
         courses = json.loads(response.text)
         unit_key = f"{dp1}-{dp2}-{dp3}"
@@ -97,27 +100,6 @@ class CoursesSpider(scrapy.Spider):
                 )
             else:
                 yield from self.process_course_item(item, c)
-
-    def parse_syllabus(self, response):
-        """Parse syllabus page - can be extended by subclasses"""
-        item = response.meta["item"]
-        course_data = response.meta.get("course_data", {})
-
-        # Fetch course name in English
-        name_en = response.css("#CourseNameEn::text").get()
-        if name_en:
-            item["name_en"] = name_en.strip()
-
-        # Fetch course objective
-        objective_all = response.css(
-            "body > div.container.sylview-section > div > div > div > p::text"
-        ).getall()
-        if objective_all:
-            item["objective"] = " ".join(
-                [text.strip() for text in objective_all if text.strip()]
-            )
-
-        yield from self.process_course_item(item, course_data)
 
     def create_course_item(self, c, semester, unit_info):
         """Create course item - can be extended by subclasses"""
@@ -159,5 +141,23 @@ class CoursesSpider(scrapy.Spider):
             student_count=None,
         )
 
-    def process_course_item(self, item, course_data):
-        yield item
+    def parse_syllabus(self, response):
+        """Parse syllabus page - can be extended by subclasses"""
+        item = response.meta["item"]
+        course_data = response.meta.get("course_data", {})
+
+        # Fetch course name in English
+        name_en = response.css("#CourseNameEn::text").get()
+        if name_en:
+            item["name_en"] = name_en.strip()
+
+        # Fetch course objective
+        objective_all = response.css(
+            "body > div.container.sylview-section > div > div > div > p::text"
+        ).getall()
+        if objective_all:
+            item["objective"] = " ".join(
+                [text.strip() for text in objective_all if text.strip()]
+            )
+
+        yield from self.process_course_item(item, course_data)
