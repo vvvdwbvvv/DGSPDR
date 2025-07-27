@@ -10,4 +10,5 @@ checkstyle:
 	    exit 1; \
 	fi
 courses:
+	cd NCCUCrawl && \
 	python3 -m scrapy crawl courses
