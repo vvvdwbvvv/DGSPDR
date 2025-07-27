@@ -83,24 +83,6 @@ class CoursesSpider(scrapy.Spider):
     def process_course_item(self, item, course_data):
         yield item
 
-    def parse_course_list(self, response, semester, dp1, dp2, dp3):
-        courses = json.loads(response.text)
-        unit_key = f"{dp1}-{dp2}-{dp3}"
-        unit_info = self.unit_mapping.get(unit_key, {})
-
-        for c in courses:
-            item = self.create_course_item(c, semester, unit_info)
-
-            # deal with syllabus url
-            if c.get("teaSchmUrl"):
-                yield scrapy.Request(
-                    url=c["teaSchmUrl"],
-                    callback=self.parse_syllabus,
-                    meta={"item": item, "course_data": c},
-                )
-            else:
-                yield from self.process_course_item(item, c)
-
     def create_course_item(self, c, semester, unit_info):
         """Create course item - can be extended by subclasses"""
         return CourseItem(
@@ -140,6 +122,24 @@ class CoursesSpider(scrapy.Spider):
             student_limit=None,
             student_count=None,
         )
+
+    def parse_course_list(self, response, semester, dp1, dp2, dp3):
+        courses = json.loads(response.text)
+        unit_key = f"{dp1}-{dp2}-{dp3}"
+        unit_info = self.unit_mapping.get(unit_key, {})
+
+        for c in courses:
+            item = self.create_course_item(c, semester, unit_info)
+
+            # deal with syllabus url
+            if c.get("teaSchmUrl"):
+                yield scrapy.Request(
+                    url=c["teaSchmUrl"],
+                    callback=self.parse_syllabus,
+                    meta={"item": item, "course_data": c},
+                )
+            else:
+                yield from self.process_course_item(item, c)
 
     def parse_syllabus(self, response):
         """Parse syllabus page - can be extended by subclasses"""
