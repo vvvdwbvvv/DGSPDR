@@ -318,6 +318,12 @@ class ETLPipeline:
         "法文": "french",
         "德文": "german",
         "西班牙文": "spanish",
+        "阿拉伯文": "arabic",
+        "越南文": "vietnamese",
+        "泰文": "thai",
+        "土耳其文": "turkish",
+        "印尼文": "indonesian",
+        "其他": "other",
         "": "unknown",
     }
 
