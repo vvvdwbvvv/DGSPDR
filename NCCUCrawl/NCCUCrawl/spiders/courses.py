@@ -146,6 +146,7 @@ class CoursesSpider(scrapy.Spider):
             transition_type_en="",
             info=c.get("info", ""),
             info_en=c.get("infoEn", ""),
+            note=c.get("note", ""),
             note_en=c.get("noteEn", ""),
             syllabus=c.get("teaSchmUrl", ""),
             syllabus_en="",
