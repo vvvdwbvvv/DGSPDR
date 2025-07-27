@@ -48,7 +48,7 @@ class CoursesSpider(scrapy.Spider):
                                     if " / " in l3["utL3Text"]
                                     else "",
                                 }
-        categories=self.get_categories(units)
+        categories = self.get_categories(units)
         semesters = self.get_semesters()
 
         for sem in semesters:
@@ -59,7 +59,7 @@ class CoursesSpider(scrapy.Spider):
                     callback=self.parse_course_list,
                     cb_kwargs={"semester": sem, "dp1": dp1, "dp2": dp2, "dp3": dp3},
                 )
-        
+
     def get_categories(self, units):
         return [
             (l1["utCodL1"], l2["utCodL2"], l3["utCodL3"])
@@ -73,7 +73,7 @@ class CoursesSpider(scrapy.Spider):
 
     def get_semesters(self):
         return ["1141"]
-        
+
     def build_course_list_url(self, sem, dp1, dp2, dp3):
         return (
             "https://es.nccu.edu.tw/course/zh-TW/"
@@ -84,10 +84,10 @@ class CoursesSpider(scrapy.Spider):
         courses = json.loads(response.text)
         unit_key = f"{dp1}-{dp2}-{dp3}"
         unit_info = self.unit_mapping.get(unit_key, {})
-        
+
         for c in courses:
             item = self.create_course_item(c, semester, unit_info)
-            
+
             # deal with syllabus url
             if c.get("teaSchmUrl"):
                 yield scrapy.Request(
@@ -157,6 +157,6 @@ class CoursesSpider(scrapy.Spider):
             student_limit=None,
             student_count=None,
         )
+
     def process_course_item(self, item, course_data):
         yield item
-
