@@ -305,3 +305,43 @@ class SCSRSQLitePipeline:
         """
         self.cur.execute(sql, dict(i))
         self.conn.commit()
+
+
+class ETLPipeline:
+    LANGUAGE_MAPPING = {
+        "中文": "chinese",
+        "英文": "english",
+        "英語": "english",
+        "日文": "japanese",
+        "韓文": "korean",
+        "韓語": "korean",
+        "法文": "french",
+        "德文": "german",
+        "西班牙文": "spanish",
+        "": "unknown",
+    }
+
+    SEM_MAPPING = {
+        "單學期科目": 1,
+        "全學年科目": 2,
+        "三學期科目": 3,
+    }
+
+    KIND_MAPPING = {
+        "必修": 1,
+        "選修": 2,
+        "群修": 3,
+    }
+
+    def process_item(self, item, spider):
+        """Process items and clean data before storing."""
+        if item.__class__.__name__ == "CourseItem":
+            item = self.clean_course_item(item)
+        return item
+
+    def clean_course_item(self, item):
+        """Clean and transform course item fields."""
+        item["lang_en"] = self.LANGUAGE_MAPPING.get(item["lang"], "unknown")
+        item["sem_qty"] = self.SEM_MAPPING.get(item["sem_qty"], 0)
+        item["kind"] = self.KIND_MAPPING.get(item["kind"], 0)
+        return item

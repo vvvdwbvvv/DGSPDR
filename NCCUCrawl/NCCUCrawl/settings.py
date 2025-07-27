@@ -59,6 +59,7 @@ DOWNLOAD_DELAY = 0.25
 # Configure item pipelines
 # See https://docs.scrapy.org/en/latest/topics/item-pipeline.html
 ITEM_PIPELINES = {
+    "NCCUCrawl.pipelines.ETLPipeline": 200,
     "NCCUCrawl.pipelines.SCSRSQLitePipeline": 300,
 }
 
