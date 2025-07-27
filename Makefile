@@ -9,5 +9,5 @@ checkstyle:
 	if [ $$ruff_check_status -ne 0 ] || [ $$ruff_format_status -ne 0 ]; then \
 	    exit 1; \
 	fi
-course:
+courses:
 	python3 -m scrapy crawl courses
