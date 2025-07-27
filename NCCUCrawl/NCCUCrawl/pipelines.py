@@ -345,9 +345,61 @@ class ETLPipeline:
             item = self.clean_course_item(item)
         return item
 
-    def clean_course_item(self, item):
+    def _transform_mappings(self, item):
         """Clean and transform course item fields."""
         item["lang_en"] = self.LANGUAGE_MAPPING.get(item["lang"], "unknown")
         item["sem_qty"] = self.SEM_MAPPING.get(item["sem_qty"], 0)
         item["kind"] = self.KIND_MAPPING.get(item["kind"], 0)
+        return item
+
+    def _ensure_required_fields(self, item):
+        required_string_fields = [
+            "note",
+            "note_en",
+            "unit_en",
+            "department",
+            "transition_type_en",
+            "name_en",
+            "objective",
+            "objective_en",
+            "syllabus_en",
+            "teacher_id",
+            "syllabus",
+            "info",
+            "info_en",
+            "discipline",
+        ]
+
+        required_integer_fields = ["last_enroll", "student_limit", "student_count"]
+
+        for field in required_string_fields:
+            if item.get(field) is None:
+                item[field] = ""
+
+        for field in required_integer_fields:
+            if item.get(field) is None:
+                item[field] = None
+
+        return item
+
+    def _fix_data_types(self, item):
+        if isinstance(item.get("syllabus"), (tuple, list)):
+            item["syllabus"] = str(item["syllabus"][0]) if item["syllabus"] else ""
+
+        if item.get("core") is not None and not isinstance(item["core"], bool):
+            item["core"] = bool(item["core"])
+
+        if item.get("credit") is not None:
+            try:
+                item["credit"] = float(item["credit"])
+            except (ValueError, TypeError):
+                item["credit"] = None
+
+        return item
+
+    def clean_course_item(self, item):
+        item = self._transform_mappings(item)
+        item = self._ensure_required_fields(item)
+        item = self._fix_data_types(item)
+
         return item
