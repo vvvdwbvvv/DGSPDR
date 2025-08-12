@@ -8,7 +8,7 @@
 import sqlite3
 from scrapy.exceptions import DropItem
 
-
+# mainly hard coding sql syntax: suggest folding it
 class SCSRSQLitePipeline:
     def open_spider(self, spider):
         """Open a connection to the SQLite database."""
@@ -32,6 +32,16 @@ class SCSRSQLitePipeline:
             self.upsert_rate(item)
         elif item.__class__.__name__ == "CourseRemainItem":
             self.upsert_remain(item)
+        elif item.__class__.__name__ == "CourseLegacyItem":
+            self.upsert_course_legacy(item)
+        elif item.__class__.__name__ == "TeacherLegacyItem":
+            self.upsert_teacher_legacy(item)
+        elif item.__class__.__name__ == "RateLegacyItem":
+            self.upsert_rate_legacy(item)
+        elif item.__class__.__name__ == "ResultItem":
+            self.upsert_result(item)
+        elif item.__class__.__name__ == "RemainLegacyItem":
+            self.upsert_remain_legacy(item)
         else:
             raise DropItem(f"unknown item type: {type(item)}")
         return item
@@ -146,6 +156,131 @@ class SCSRSQLitePipeline:
             teacher_id TEXT REFERENCES teacher(id),
             content TEXT,
             content_en TEXT
+        )
+        """)
+
+        # Course Legacy table
+        self.cur.execute("""
+        CREATE TABLE IF NOT EXISTS course_legacy (
+            id TEXT PRIMARY KEY,
+            y TEXT,
+            s TEXT,
+            subNum TEXT,
+            name TEXT,
+            name_en TEXT,
+            teacher TEXT,
+            teacherEn TEXT,
+            kind TEXT,
+            time TEXT,
+            timeEn TEXT,
+            lmtKind TEXT,
+            lmtKindEn TEXT,
+            lang TEXT,
+            langEn TEXT,
+            semQty TEXT,
+            classroom TEXT,
+            classroomId TEXT,
+            unit TEXT,
+            unitEn TEXT,
+            dp1 TEXT,
+            dp2 TEXT,
+            dp3 TEXT,
+            point REAL,
+            subRemainUrl TEXT,
+            subSetUrl TEXT,
+            subUnitRuleUrl TEXT,
+            teaExpUrl TEXT,
+            teaSchmUrl TEXT,
+            tranTpe TEXT,
+            tranTpeEn TEXT,
+            info TEXT,
+            infoEn TEXT,
+            note TEXT,
+            noteEn TEXT,
+            syllabus TEXT,
+            objective TEXT
+        )
+        """)
+
+        # Teacher Legacy table
+        self.cur.execute("""
+        CREATE TABLE IF NOT EXISTS teacher_legacy (
+            id TEXT PRIMARY KEY,
+            name TEXT
+        )
+        """)
+
+        # Rate Legacy table
+        self.cur.execute("""
+        CREATE TABLE IF NOT EXISTS rate_legacy (
+            courseId TEXT,
+            rowId TEXT,
+            teacherId TEXT,
+            content TEXT,
+            contentEn TEXT,
+            PRIMARY KEY (courseId, rowId)
+        )
+        """)
+
+        # Result table
+        self.cur.execute("""
+        CREATE TABLE IF NOT EXISTS result (
+            courseId TEXT PRIMARY KEY,
+            yearsem TEXT,
+            name TEXT,
+            teacher TEXT,
+            time TEXT,
+            studentLimit INTEGER,
+            studentCount INTEGER,
+            lastEnroll INTEGER
+        )
+        """)
+
+        #  Remain Legacy table
+        self.cur.execute("""
+        CREATE TABLE IF NOT EXISTS remain_legacy (
+            id TEXT PRIMARY KEY,
+            signableAdding BOOLEAN,
+            waitingList INTEGER,
+            originLimit INTEGER,
+            originRegistered INTEGER,
+            originAvailable INTEGER,
+            allLimit INTEGER,
+            allRegistered INTEGER,
+            allAvailable INTEGER,
+            otherDeptLimit INTEGER,
+            otherDeptRegistered INTEGER,
+            otherDeptAvailable INTEGER,
+            sameGradeLimit INTEGER,
+            sameGradeRegistered INTEGER,
+            sameGradeAvailable INTEGER,
+            diffGradeLimit INTEGER,
+            diffGradeRegistered INTEGER,
+            diffGradeAvailable INTEGER,
+            minorLimit INTEGER,
+            minorRegistered INTEGER,
+            minorAvailable INTEGER,
+            doubleMajorLimit INTEGER,
+            doubleMajorRegistered INTEGER,
+            doubleMajorAvailable INTEGER,
+            otherDeptInCollegeLimit INTEGER,
+            otherDeptInCollegeRegistered INTEGER,
+            otherDeptInCollegeAvailable INTEGER,
+            otherCollegeLimit INTEGER,
+            otherCollegeRegistered INTEGER,
+            otherCollegeAvailable INTEGER,
+            programLimit INTEGER,
+            programRegistered INTEGER,
+            programAvailable INTEGER,
+            sameGradeAndAboveLimit INTEGER,
+            sameGradeAndAboveRegistered INTEGER,
+            sameGradeAndAboveAvailable INTEGER,
+            lowerGradeLimit INTEGER,
+            lowerGradeRegistered INTEGER,
+            lowerGradeAvailable INTEGER,
+            otherProgramLimit INTEGER,
+            otherProgramRegistered INTEGER,
+            otherProgramAvailable INTEGER
         )
         """)
 
@@ -305,7 +440,166 @@ class SCSRSQLitePipeline:
         """
         self.cur.execute(sql, dict(i))
         self.conn.commit()
+    
+    def upsert_course_legacy(self, i):
+        """處理 CourseLegacyItem"""
+        sql = """
+        INSERT INTO course_legacy (
+            id, y, s, subNum, name, name_en, teacher, teacherEn,
+            kind, time, timeEn, lmtKind, lmtKindEn, lang, langEn,
+            semQty, classroom, classroomId, unit, unitEn,
+            dp1, dp2, dp3, point, subRemainUrl, subSetUrl,
+            subUnitRuleUrl, teaExpUrl, teaSchmUrl, tranTpe, tranTpeEn,
+            info, infoEn, note, noteEn, syllabus, objective
+        ) VALUES (
+            :id, :y, :s, :subNum, :name, :name_en, :teacher, :teacherEn,
+            :kind, :time, :timeEn, :lmtKind, :lmtKindEn, :lang, :langEn,
+            :semQty, :classroom, :classroomId, :unit, :unitEn,
+            :dp1, :dp2, :dp3, :point, :subRemainUrl, :subSetUrl,
+            :subUnitRuleUrl, :teaExpUrl, :teaSchmUrl, :tranTpe, :tranTpeEn,
+            :info, :infoEn, :note, :noteEn, :syllabus, :objective
+        )
+        ON CONFLICT(id) DO UPDATE SET 
+            name         = excluded.name,
+            name_en      = excluded.name_en,
+            teacher      = excluded.teacher,
+            teacherEn    = excluded.teacherEn,
+            kind         = excluded.kind,
+            time         = excluded.time,
+            timeEn       = excluded.timeEn,
+            lmtKind      = excluded.lmtKind,
+            lmtKindEn    = excluded.lmtKindEn,
+            lang         = excluded.lang,
+            langEn       = excluded.langEn,
+            semQty       = excluded.semQty,
+            classroom    = excluded.classroom,
+            classroomId  = excluded.classroomId,
+            unit         = excluded.unit,
+            unitEn       = excluded.unitEn,
+            dp1          = excluded.dp1,
+            dp2          = excluded.dp2,
+            dp3          = excluded.dp3,
+            point        = excluded.point,
+            subRemainUrl = excluded.subRemainUrl,
+            subSetUrl    = excluded.subSetUrl,
+            subUnitRuleUrl = excluded.subUnitRuleUrl,
+            teaExpUrl    = excluded.teaExpUrl,
+            teaSchmUrl   = excluded.teaSchmUrl,
+            tranTpe      = excluded.tranTpe,
+            tranTpeEn    = excluded.tranTpeEn,
+            info         = excluded.info,
+            infoEn       = excluded.infoEn,
+            note         = excluded.note,
+            noteEn       = excluded.noteEn,
+            syllabus     = excluded.syllabus,
+            objective    = excluded.objective;
+        """
+        self.cur.execute(sql, dict(i))
+        self.conn.commit()
 
+    def upsert_teacher_legacy(self, i):
+        """處理 TeacherLegacyItem"""
+        sql = """
+        INSERT INTO teacher_legacy (id, name)
+        VALUES (:id, :name)
+        ON CONFLICT(id) DO UPDATE SET 
+            name = excluded.name;
+        """
+        self.cur.execute(sql, dict(i))
+        self.conn.commit()
+
+    def upsert_rate_legacy(self, i):
+        """處理 RateLegacyItem"""
+        sql = """
+        INSERT INTO rate_legacy (courseId, rowId, teacherId, content, contentEn)
+        VALUES (:courseId, :rowId, :teacherId, :content, :contentEn)
+        ON CONFLICT(courseId, rowId) DO UPDATE SET 
+            teacherId = excluded.teacherId,
+            content   = excluded.content,
+            contentEn = excluded.contentEn;
+        """
+        self.cur.execute(sql, dict(i))
+        self.conn.commit()
+    
+    def upsert_remain_legacy(self, i):
+        """處理 RemainLegacyItem"""
+        sql = """
+        INSERT INTO remain_legacy (
+            id, signableAdding, waitingList,
+            originLimit, originRegistered, originAvailable,
+            allLimit, allRegistered, allAvailable,
+            otherDeptLimit, otherDeptRegistered, otherDeptAvailable,
+            sameGradeLimit, sameGradeRegistered, sameGradeAvailable,
+            diffGradeLimit, diffGradeRegistered, diffGradeAvailable,
+            minorLimit, minorRegistered, minorAvailable,
+            doubleMajorLimit, doubleMajorRegistered, doubleMajorAvailable,
+            otherDeptInCollegeLimit, otherDeptInCollegeRegistered, otherDeptInCollegeAvailable,
+            otherCollegeLimit, otherCollegeRegistered, otherCollegeAvailable,
+            programLimit, programRegistered, programAvailable,
+            sameGradeAndAboveLimit, sameGradeAndAboveRegistered, sameGradeAndAboveAvailable,
+            lowerGradeLimit, lowerGradeRegistered, lowerGradeAvailable,
+            otherProgramLimit, otherProgramRegistered, otherProgramAvailable
+        ) VALUES (
+        :id, :signableAdding, :waitingList,
+            :originLimit, :originRegistered, :originAvailable,
+            :allLimit, :allRegistered, :allAvailable,
+            :otherDeptLimit, :otherDeptRegistered, :otherDeptAvailable,
+            :sameGradeLimit, :sameGradeRegistered, :sameGradeAvailable,
+            :diffGradeLimit, :diffGradeRegistered, :diffGradeAvailable,
+            :minorLimit, :minorRegistered, :minorAvailable,
+            :doubleMajorLimit, :doubleMajorRegistered, :doubleMajorAvailable,
+            :otherDeptInCollegeLimit, :otherDeptInCollegeRegistered, :otherDeptInCollegeAvailable,
+            :otherCollegeLimit, :otherCollegeRegistered, :otherCollegeAvailable,
+            :programLimit, :programRegistered, :programAvailable,
+            :sameGradeAndAboveLimit, :sameGradeAndAboveRegistered, :sameGradeAndAboveAvailable,
+            :lowerGradeLimit, :lowerGradeRegistered, :lowerGradeAvailable,
+            :otherProgramLimit, :otherProgramRegistered, :otherProgramAvailable
+        )
+        ON CONFLICT(id) DO UPDATE SET
+            signableAdding              = excluded.signableAdding,
+            waitingList                 = excluded.waitingList,
+            originLimit                 = excluded.originLimit,
+            originRegistered            = excluded.originRegistered,
+            originAvailable             = excluded.originAvailable,
+            allLimit                    = excluded.allLimit,
+            allRegistered               = excluded.allRegistered,
+            allAvailable                = excluded.allAvailable,
+            otherDeptLimit              = excluded.otherDeptLimit,
+            otherDeptRegistered         = excluded.otherDeptRegistered,
+            otherDeptAvailable          = excluded.otherDeptAvailable,
+            sameGradeLimit              = excluded.sameGradeLimit,
+            sameGradeRegistered         = excluded.sameGradeRegistered,
+            sameGradeAvailable          = excluded.sameGradeAvailable,
+            diffGradeLimit              = excluded.diffGradeLimit,
+            diffGradeRegistered         = excluded.diffGradeRegistered,
+            diffGradeAvailable          = excluded.diffGradeAvailable,
+            minorLimit                  = excluded.minorLimit,
+            minorRegistered             = excluded.minorRegistered,
+            minorAvailable              = excluded.minorAvailable,
+            doubleMajorLimit            = excluded.doubleMajorLimit,
+            doubleMajorRegistered       = excluded.doubleMajorRegistered,
+            doubleMajorAvailable        = excluded.doubleMajorAvailable,
+            otherDeptInCollegeLimit     = excluded.otherDeptInCollegeLimit,
+            otherDeptInCollegeRegistered = excluded.otherDeptInCollegeRegistered,
+            otherDeptInCollegeAvailable = excluded.otherDeptInCollegeAvailable,
+            otherCollegeLimit           = excluded.otherCollegeLimit,
+            otherCollegeRegistered      = excluded.otherCollegeRegistered,
+            otherCollegeAvailable       = excluded.otherCollegeAvailable,
+            programLimit                = excluded.programLimit,
+            rogramRegistered           = excluded.programRegistered,
+            programAvailable            = excluded.programAvailable,
+            sameGradeAndAboveLimit      = excluded.sameGradeAndAboveLimit,
+            sameGradeAndAboveRegistered = excluded.sameGradeAndAboveRegistered,
+            sameGradeAndAboveAvailable  = excluded.sameGradeAndAboveAvailable,
+            lowerGradeLimit             = excluded.lowerGradeLimit,
+            lowerGradeRegistered        = excluded.lowerGradeRegistered,
+            lowerGradeAvailable         = excluded.lowerGradeAvailable,
+            otherProgramLimit           = excluded.otherProgramLimit,
+            otherProgramRegistered      = excluded.otherProgramRegistered,
+            otherProgramAvailable       = excluded.otherProgramAvailable;
+        """
+        self.cur.execute(sql, dict(i))
+        self.conn.commit()
 
 class ETLPipeline:
     LANGUAGE_MAPPING = {

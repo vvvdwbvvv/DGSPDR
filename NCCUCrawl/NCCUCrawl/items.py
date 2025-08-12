@@ -101,3 +101,112 @@ class RateItem(scrapy.Item):
     teacher_id = scrapy.Field()  # FK → teacher.id
     content = scrapy.Field()
     content_en = scrapy.Field()
+
+
+class CourseLegacyItem(scrapy.Item):
+    id = scrapy.Field()  # PK
+    y = scrapy.Field()
+    s = scrapy.Field()
+    subNum = scrapy.Field()
+    name = scrapy.Field()
+    name_en = scrapy.Field()
+    teacher = scrapy.Field()
+    teacherEn = scrapy.Field()
+    kind = scrapy.Field()
+    time = scrapy.Field()
+    timeEn = scrapy.Field()
+    lmtKind = scrapy.Field()
+    lmtKindEn = scrapy.Field()
+    lang = scrapy.Field()
+    langEn = scrapy.Field()
+    semQty = scrapy.Field()
+    classroom = scrapy.Field()
+    classroomId = scrapy.Field()
+    unit = scrapy.Field()
+    unitEn = scrapy.Field()
+    dp1 = scrapy.Field()
+    dp2 = scrapy.Field()
+    dp3 = scrapy.Field()
+    point = scrapy.Field()
+    subRemainUrl = scrapy.Field()
+    subSetUrl = scrapy.Field()
+    subUnitRuleUrl = scrapy.Field()
+    teaExpUrl = scrapy.Field()
+    teaSchmUrl = scrapy.Field()
+    tranTpe = scrapy.Field()
+    tranTpeEn = scrapy.Field()
+    info = scrapy.Field()
+    infoEn = scrapy.Field()
+    note = scrapy.Field()
+    noteEn = scrapy.Field()
+    syllabus = scrapy.Field()
+    objective = scrapy.Field()
+
+
+class TeacherLegacyItem(scrapy.Item):
+    id = scrapy.Field()  # PK
+    name = scrapy.Field()  # PK
+
+
+class RateLegacyItem(scrapy.Item):
+    courseId = scrapy.Field()  # PK
+    rowId = scrapy.Field()  # PK
+    teacherId = scrapy.Field()
+    content = scrapy.Field()
+    contentEn = scrapy.Field()
+
+
+class ResultItem(scrapy.Item):
+    courseId = scrapy.Field()  # PK
+    yearsem = scrapy.Field()
+    name = scrapy.Field()
+    teacher = scrapy.Field()
+    time = scrapy.Field()
+    studentLimit = scrapy.Field()
+    studentCount = scrapy.Field()
+    lastEnroll = scrapy.Field()
+
+
+class RemainLegacyItem(scrapy.Item):
+    id = scrapy.Field()  # PK
+    signableAdding = scrapy.Field()
+    waitingList = scrapy.Field()
+    originLimit = scrapy.Field()
+    originRegistered = scrapy.Field()
+    originAvailable = scrapy.Field()
+    allLimit = scrapy.Field()
+    allRegistered = scrapy.Field()
+    allAvailable = scrapy.Field()
+    otherDeptLimit = scrapy.Field()
+    otherDeptRegistered = scrapy.Field()
+    otherDeptAvailable = scrapy.Field()
+    sameGradeLimit = scrapy.Field()
+    sameGradeRegistered = scrapy.Field()
+    sameGradeAvailable = scrapy.Field()
+    diffGradeLimit = scrapy.Field()
+    diffGradeRegistered = scrapy.Field()
+    diffGradeAvailable = scrapy.Field()
+    minorLimit = scrapy.Field()
+    minorRegistered = scrapy.Field()
+    minorAvailable = scrapy.Field()
+    doubleMajorLimit = scrapy.Field()
+    doubleMajorRegistered = scrapy.Field()
+    doubleMajorAvailable = scrapy.Field()
+    otherDeptInCollegeLimit = scrapy.Field()
+    otherDeptInCollegeRegistered = scrapy.Field()
+    otherDeptInCollegeAvailable = scrapy.Field()
+    otherCollegeLimit = scrapy.Field()
+    otherCollegeRegistered = scrapy.Field()
+    otherCollegeAvailable = scrapy.Field()
+    programLimit = scrapy.Field()
+    programRegistered = scrapy.Field()
+    programAvailable = scrapy.Field()
+    sameGradeAndAboveLimit = scrapy.Field()
+    sameGradeAndAboveRegistered = scrapy.Field()
+    sameGradeAndAboveAvailable = scrapy.Field()
+    lowerGradeLimit = scrapy.Field()
+    lowerGradeRegistered = scrapy.Field()
+    lowerGradeAvailable = scrapy.Field()
+    otherProgramLimit = scrapy.Field()
+    otherProgramRegistered = scrapy.Field()
+    otherProgramAvailable = scrapy.Field()
