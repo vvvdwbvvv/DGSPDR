@@ -3,7 +3,7 @@ from NCCUCrawl.items import CourseRemainItem
 from .courses import CoursesSpider
 
 
-class CourseRemainSpider(CoursesSpider): # implement the course spider
+class CourseRemainSpider(CoursesSpider):  # implement the course spider
     name = "remain"
 
     PROPERTY_NAME = {

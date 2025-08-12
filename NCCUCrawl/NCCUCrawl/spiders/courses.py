@@ -61,18 +61,34 @@ class CoursesSpider(scrapy.Spider):
                 )
 
     def get_categories(self, units):
-        return [
-            (l1["utCodL1"], l2["utCodL2"], l3["utCodL3"])
-            for l1 in units
-            if l1["utCodL1"] != "0"
-            for l2 in l1["utL2"]
-            if l2["utCodL2"] != "0"
-            for l3 in l2["utL3"]
-            if l3["utCodL3"] != "0"
-        ]
+        categories = []
+
+        for l1 in units:
+            if l1["utCodL1"] != "0":
+                # 添加只有 dp1 的情況 (dp2="", dp3="")
+                categories.append((l1["utCodL1"], "", ""))
+
+                for l2 in l1["utL2"]:
+                    if l2["utCodL2"] != "0":
+                        # 添加只有 dp1, dp2 的情況 (dp3="")
+                        categories.append((l1["utCodL1"], l2["utCodL2"], ""))
+
+                        for l3 in l2["utL3"]:
+                            if l3["utCodL3"] != "0":
+                                # 原本的完整三層情況
+                                categories.append(
+                                    (l1["utCodL1"], l2["utCodL2"], l3["utCodL3"])
+                                )
+
+        return categories
 
     def get_semesters(self):
-        return ["1141"]
+        return [
+            "1011", "1012", "1021", "1022", "1031", "1032", "1041", "1042",
+            "1051", "1052", "1061", "1062", "1071", "1072", "1081", "1082", 
+            "1091", "1092", "1101", "1102", "1111", "1112", "1121", "1122",
+            "1131", "1132", "1141"
+        ]
 
     def build_course_list_url(self, sem, dp1, dp2, dp3):
         return (
