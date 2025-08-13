@@ -143,6 +143,7 @@ class SmartCoursesSpider(CoursesLegacySpider):
         # 語言與限制
         item["lmtKind"] = course_data.get("subLmtKind", "")
         item["lmtKindEn"] = course_data.get("subLmtKindEn", "")
+        item["core"] = 1 if course_data.get("core", "") == "是" else 0
         item["lang"] = course_data.get("subLang", "")
         item["langEn"] = course_data.get("subLangEn", "")
         item["semQty"] = course_data.get("subSemQty", "")

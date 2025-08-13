@@ -447,14 +447,14 @@ class SCSRSQLitePipeline:
         sql = """
         INSERT INTO course_legacy (
             id, y, s, subNum, name, nameEn, teacher, teacherEn,
-            kind, time, timeEn, lmtKind, lmtKindEn, lang, langEn,
+            kind, time, timeEn, lmtKind, lmtKindEn, core, lang, langEn,
             semQty, classroom, classroomId, unit, unitEn,
             dp1, dp2, dp3, point, subRemainUrl, subSetUrl,
             subUnitRuleUrl, teaExpUrl, teaSchmUrl, tranTpe, tranTpeEn,
             info, infoEn, note, noteEn, syllabus, objective
         ) VALUES (
             :id, :y, :s, :subNum, :name, :nameEn, :teacher, :teacherEn,
-            :kind, :time, :timeEn, :lmtKind, :lmtKindEn, :lang, :langEn,
+            :kind, :time, :timeEn, :lmtKind, :lmtKindEn, :core, :lang, :langEn,
             :semQty, :classroom, :classroomId, :unit, :unitEn,
             :dp1, :dp2, :dp3, :point, :subRemainUrl, :subSetUrl,
             :subUnitRuleUrl, :teaExpUrl, :teaSchmUrl, :tranTpe, :tranTpeEn,
@@ -470,6 +470,7 @@ class SCSRSQLitePipeline:
             timeEn       = excluded.timeEn,
             lmtKind      = excluded.lmtKind,
             lmtKindEn    = excluded.lmtKindEn,
+            core         = excluded.core,
             lang         = excluded.lang,
             langEn       = excluded.langEn,
             semQty       = excluded.semQty,
@@ -672,6 +673,54 @@ class ETLPipeline:
             if item.get(field) is None:
                 item[field] = ""
 
+        for field in required_integer_fields:
+            if item.get(field) is None:
+                item[field] = None
+
+        return item
+
+    def _fix_data_types(self, item):
+        if isinstance(item.get("syllabus"), (tuple, list)):
+            item["syllabus"] = str(item["syllabus"][0]) if item["syllabus"] else ""
+
+        if item.get("core") is not None and not isinstance(item["core"], bool):
+            item["core"] = bool(item["core"])
+
+        if item.get("credit") is not None:
+            try:
+                item["credit"] = float(item["credit"])
+            except (ValueError, TypeError):
+                item["credit"] = None
+
+        return item
+
+    def clean_course_item(self, item):
+        item = self._transform_mappings(item)
+        item = self._ensure_required_fields(item)
+        item = self._fix_data_types(item)
+
+        return item
+
+class ETLPipelineLegacy:
+    KIND_MAPPING = {
+        "必修": 1,
+        "選修": 2,
+        "群修": 3,
+    }
+
+    def process_item(self, item, spider):
+        """Process items and clean data before storing."""
+        if item.__class__.__name__ == "CourseItem":
+            item = self.clean_course_item(item)
+        return item
+
+    def _transform_mappings(self, item):
+        """Clean and transform course item fields."""
+        item["kind"] = self.KIND_MAPPING.get(item["kind"], 0)
+        return item
+
+    def _ensure_required_fields(self, item):
+        required_integer_fields = ["last_enroll", "student_limit", "student_count"]
         for field in required_integer_fields:
             if item.get(field) is None:
                 item[field] = None

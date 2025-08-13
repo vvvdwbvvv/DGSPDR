@@ -103,6 +103,14 @@ class CoursesLegacySpider(scrapy.Spider):
     def process_course_item(self, item, course_data):
         yield item
 
+    def convert_kind_to_int(self, kind_str):
+        kind_mapping = {
+            "必修": 1,
+            "選修": 2,
+            "群修": 3,
+        }
+        return kind_mapping.get(kind_str, 0)
+
     def create_course_item(self, c, semester, unit_info, dp1, dp2, dp3):
         """Create course item - can be extended by subclasses"""
         return CourseLegacyItem(
@@ -114,11 +122,12 @@ class CoursesLegacySpider(scrapy.Spider):
             nameEn=c.get("subNamEn", ""),  # from en api
             teacher=c.get("teaNam", ""),
             teacherEn=c.get("teaNamEn", ""),  # from en api
-            kind=c.get("subKind", ""),
+            kind=self.convert_kind_to_int(c.get("subKind", "")),
             time=c.get("subTime", ""),
             timeEn=c.get("subTimeEn", ""),  # from en api
             lmtKind=c.get("lmtKind", ""),
             lmtKindEn=c.get("lmtKindEn", ""),  # from en api
+            core=1 if c.get("core", "") == "是" else 0,
             lang=c.get("langTpe", ""),
             langEn=c.get("langTpeEn", ""),  # from en api
             semQty=c.get("smtQty", ""),

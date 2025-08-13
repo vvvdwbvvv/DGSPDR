@@ -118,6 +118,7 @@ class CourseLegacyItem(scrapy.Item):
     timeEn = scrapy.Field()
     lmtKind = scrapy.Field()
     lmtKindEn = scrapy.Field()
+    core = scrapy.Field()
     lang = scrapy.Field()
     langEn = scrapy.Field()
     semQty = scrapy.Field()
