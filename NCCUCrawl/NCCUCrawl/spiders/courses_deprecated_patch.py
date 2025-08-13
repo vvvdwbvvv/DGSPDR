@@ -94,19 +94,29 @@ class SmartCoursesSpider(CoursesLegacySpider):
                         self.logger.warning("API limit reached")
                         return
 
+                    item = self.create_course_item(
+                        c, semester, unit_info, dp1, dp2, dp3
+                    )
                     course_id = f"{semester}{c['subNum']}"
 
-                    # 直接創建完整的 CourseLegacyItem
-                    item = self.create_complete_course_legacy_item(
-                        c, semester, unit_info, dp1, dp2, dp3
+                    zh_url = self.build_course_detail_url_zh(course_id)
+                    yield scrapy.Request(
+                        url=zh_url,
+                        callback=self.parse_course_detail_zh,
+                        meta={
+                            "item": item,
+                            "course_data": c,
+                            "course_id": course_id,
+                            "semester": semester,
+                            "dp1": dp1,
+                            "dp2": dp2,
+                            "dp3": dp3,
+                        },
+                        dont_filter=True,
                     )
 
                     self.logger.debug(f"Creating item for missing course: {course_id}")
                     self.total_saved_courses += 1
-
-                    # 直接 yield item - 不需要額外的 API 請求
-                    yield item
-
                     self.api_request_count += 1
 
         except json.JSONDecodeError as e:
@@ -117,7 +127,6 @@ class SmartCoursesSpider(CoursesLegacySpider):
     def create_complete_course_legacy_item(
         self, course_data, semester, unit_info, dp1, dp2, dp3
     ):
-        """創建完整的 CourseLegacyItem，符合 Pipeline 期待的欄位"""
         item = CourseLegacyItem()
 
         # 主要識別欄位
@@ -130,58 +139,111 @@ class SmartCoursesSpider(CoursesLegacySpider):
         item["subNum"] = course_data.get("subNum", "")
 
         # 課程基本資訊
-        item["name"] = course_data.get("subName", "未知課程")
-        item["nameEn"] = course_data.get("subNameEn", "")
-        item["teacher"] = course_data.get("teacher", "未知教師")
-        item["teacherEn"] = course_data.get("teacherEn", "")
+        item["name"] = course_data.get("subNam", "")
+        item["nameEn"] = course_data.get("subNamEn", "")
+        item["teacher"] = course_data.get("teaNam", "")
+        item["teacherEn"] = course_data.get("teaNamEn", "")
 
         # 課程類別與時間
-        item["kind"] = course_data.get("subKind", "")
+        lmt_kind = course_data.get("lmtKind", "")
+        item["kind"] = self.convert_kind_to_int(
+            course_data.get("subKind", ""), lmt_kind
+        )
         item["time"] = course_data.get("subTime", "")
         item["timeEn"] = course_data.get("subTimeEn", "")
 
         # 語言與限制
-        item["lmtKind"] = course_data.get("subLmtKind", "")
-        item["lmtKindEn"] = course_data.get("subLmtKindEn", "")
+        item["lmtKind"] = course_data.get("lmtKind", "")
+        item["lmtKindEn"] = course_data.get("lmtKindEn", "")
         item["core"] = 1 if course_data.get("core", "") == "是" else 0
-        item["lang"] = course_data.get("subLang", "")
-        item["langEn"] = course_data.get("subLangEn", "")
-        item["semQty"] = course_data.get("subSemQty", "")
+        item["lang"] = course_data.get("langTpe", "")
+        item["langEn"] = course_data.get("langTpeEn", "")
+        item["semQty"] = course_data.get("smtQty", "")
 
         # 教室資訊
         item["classroom"] = course_data.get("subClassroom", "")
         item["classroomId"] = course_data.get("subClassroomId", "")
 
         # 單位資訊
-        item["unit"] = unit_info.get("unit", "未知系所")
-        item["unitEn"] = unit_info.get("unit_en", "Unknown Department")
+        item["unit"] = course_data.get("subGde", "")
+        item["unitEn"] = course_data.get("subGdeEn", "")
         item["dp1"] = dp1
         item["dp2"] = dp2
         item["dp3"] = dp3
 
         # 學分
-        item["point"] = float(course_data.get("subCredit", 0))
+        item["point"] = float(course_data.get("subPoint", 0))
 
         # URL 相關 (設為預設值)
-        item["subRemainUrl"] = ""
-        item["subSetUrl"] = ""
-        item["subUnitRuleUrl"] = ""
-        item["teaExpUrl"] = ""
-        item["teaSchmUrl"] = ""
+        item["subRemainUrl"] = course_data.get("subRemainUrl", "")
+        item["subSetUrl"] = course_data.get("subSetUrl", "")
+        item["subUnitRuleUrl"] = course_data.get("subUnitRuleUrl", "")
+        item["teaExpUrl"] = course_data.get("teaExpUrl", "")
+        item["teaSchmUrl"] = course_data.get("teaSchmUrl", "")
 
         # 其他資訊
-        item["tranTpe"] = course_data.get("subTranTpe", "")
-        item["tranTpeEn"] = course_data.get("subTranTpeEn", "")
-        item["info"] = course_data.get("subInfo", "")
-        item["infoEn"] = course_data.get("subInfoEn", "")
-        item["note"] = course_data.get("subNote", "")
-        item["noteEn"] = course_data.get("subNoteEn", "")
-
-        # 課程大綱 (預設為空，需要詳細頁面才能獲取)
+        item["tranTpe"] = course_data.get("tranTpe", "")
+        item["tranTpeEn"] = course_data.get("tranTpeEn", "")
+        item["info"] = course_data.get("info", "")
+        item["infoEn"] = course_data.get("infoEn", "")
+        item["note"] = course_data.get("note", "")
+        item["noteEn"] = course_data.get("noteEn", "")
         item["syllabus"] = ""
         item["objective"] = ""
 
         return item
+
+    def parse_syllabus(self, response):
+        """Parse syllabus page - can be extended by subclasses"""
+        item = response.meta["item"]
+        course_data = response.meta.get("course_data", {})
+
+        # Fetch course objective
+        objective_elements = response.css(
+            "body > div.container.sylview-section > div > div > div > p::text"
+        ).getall()
+        if objective_elements:
+            item["objective"] = " ".join(
+                [text.strip() for text in objective_elements if text.strip()]
+            )
+
+        description_title = response.css(
+            "div.col-sm-7.sylview--mtop.col-p-6 h2.text-primary"
+        )
+        if description_title:
+            descriptions = []
+            # Get all siblings after the h2 title
+            siblings = description_title.xpath("following-sibling::*")
+
+            for sibling in siblings:
+                # Check if we hit the stop condition (row sylview-mtop fa-border class)
+                classes = sibling.css("::attr(class)").get()
+                if classes and set(["row", "sylview-mtop", "fa-border"]).issubset(
+                    set(classes.split())
+                ):
+                    break
+
+                # Extract text content and split by newlines
+                text_content = sibling.css("::text").getall()
+                for text in text_content:
+                    lines = [
+                        line.strip()
+                        for line in text.split("\n")
+                        if line.strip() and line.strip() != " "
+                    ]
+                    descriptions.extend(lines)
+
+            if descriptions:
+                item["syllabus"] = "\n".join(descriptions)
+            else:
+                item["syllabus"] = response.url
+        else:
+            # Fallback to just storing the URL if structure is different
+            syllabus_content = response.css(".sylview-section").get()
+            if syllabus_content:
+                item["syllabus"] = response.url
+
+        yield from self.process_course_item(item, course_data)
 
     def closed(self, reason):
         self.logger.info("=== Smart Courses Spider Statistics ===")
@@ -214,55 +276,3 @@ class SmartCoursesSpider(CoursesLegacySpider):
             self.logger.info(f"✅ Created {self.total_saved_courses} CourseLegacyItems")
         else:
             self.logger.warning("❌ No items were created")
-
-
-# 測試 Pipeline 的 Spider
-class TestPipelineSpider(scrapy.Spider):
-    name = "test_pipeline"
-
-    def start_requests(self):
-        yield scrapy.Request(url="http://httpbin.org/get", callback=self.parse)
-
-    def parse(self, response):
-        # 創建測試用的 CourseLegacyItem
-        item = CourseLegacyItem()
-        item["id"] = "TEST001"
-        item["y"] = "114"
-        item["s"] = "1"
-        item["subNum"] = "TEST001"
-        item["name"] = "Test Course"
-        item["nameEn"] = "Test Course English"
-        item["teacher"] = "Test Teacher"
-        item["teacherEn"] = "Test Teacher English"
-        item["kind"] = "選修"
-        item["time"] = "Mon 1-2"
-        item["timeEn"] = "Mon 1-2"
-        item["lmtKind"] = ""
-        item["lmtKindEn"] = ""
-        item["lang"] = "中文"
-        item["langEn"] = "Chinese"
-        item["semQty"] = "單學期科目"
-        item["classroom"] = "Test Room"
-        item["classroomId"] = "TR001"
-        item["unit"] = "Test Department"
-        item["unitEn"] = "Test Department"
-        item["dp1"] = "T"
-        item["dp2"] = "TE"
-        item["dp3"] = "TES"
-        item["point"] = 3.0
-        item["subRemainUrl"] = ""
-        item["subSetUrl"] = ""
-        item["subUnitRuleUrl"] = ""
-        item["teaExpUrl"] = ""
-        item["teaSchmUrl"] = ""
-        item["tranTpe"] = ""
-        item["tranTpeEn"] = ""
-        item["info"] = ""
-        item["infoEn"] = ""
-        item["note"] = ""
-        item["noteEn"] = ""
-        item["syllabus"] = ""
-        item["objective"] = ""
-
-        self.logger.info(f"Creating test CourseLegacyItem: {item['id']}")
-        yield item

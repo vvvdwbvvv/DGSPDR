@@ -103,14 +103,6 @@ class CoursesLegacySpider(scrapy.Spider):
     def process_course_item(self, item, course_data):
         yield item
 
-    def convert_kind_to_int(self, kind_str):
-        kind_mapping = {
-            "必修": 1,
-            "選修": 2,
-            "群修": 3,
-        }
-        return kind_mapping.get(kind_str, 0)
-
     def create_course_item(self, c, semester, unit_info, dp1, dp2, dp3):
         """Create course item - can be extended by subclasses"""
         return CourseLegacyItem(
@@ -122,19 +114,19 @@ class CoursesLegacySpider(scrapy.Spider):
             nameEn=c.get("subNamEn", ""),  # from en api
             teacher=c.get("teaNam", ""),
             teacherEn=c.get("teaNamEn", ""),  # from en api
-            kind=self.convert_kind_to_int(c.get("subKind", "")),
+            kind=c.get("subKind", ""),
             time=c.get("subTime", ""),
             timeEn=c.get("subTimeEn", ""),  # from en api
             lmtKind=c.get("lmtKind", ""),
             lmtKindEn=c.get("lmtKindEn", ""),  # from en api
-            core=1 if c.get("core", "") == "是" else 0,
+            core=c.get("core", ""),
             lang=c.get("langTpe", ""),
             langEn=c.get("langTpeEn", ""),  # from en api
             semQty=c.get("smtQty", ""),
             classroom=c.get("subClassroom", ""),
             classroomId=c.get("subClassroomId", ""),  # from en api
-            unit=unit_info.get("unit", ""),
-            unitEn=unit_info.get("unit_en", ""),  # from en api
+            unit=c.get("subGde", ""),
+            unitEn=c.get("subGdeEn", ""),  # from en api
             dp1=dp1,
             dp2=dp2,
             dp3=dp3,
@@ -179,6 +171,21 @@ class CoursesLegacySpider(scrapy.Spider):
                 dont_filter=True,
             )
 
+    def convert_kind_to_int(self, kind_str, lmt_kind_str=""):
+        """Convert kind string to integer, considering lmtKind for special cases"""
+        if lmt_kind_str:
+            if "通識" in lmt_kind_str:
+                return 4
+            elif "跨領域" in lmt_kind_str:
+                return 0
+
+        kind_mapping = {
+            "必修": 1,
+            "選修": 2,
+            "群修": 3,
+        }
+        return kind_mapping.get(kind_str, 0)
+
     def parse_course_detail_zh(self, response):
         item = response.meta["item"]
         course_id = response.meta["course_id"]
@@ -187,9 +194,15 @@ class CoursesLegacySpider(scrapy.Spider):
         if len(zh_data) == 1:
             zh_course = zh_data[0]
             item["teacher"] = zh_course.get("teaNam", item["teacher"])
-            item["kind"] = zh_course.get("subKind", item["kind"])
+            item["kind"] = self.convert_kind_to_int(
+                zh_course.get("subKind", item["lmtKind"])
+            )
             item["time"] = zh_course.get("subTime", item["time"])
-            item["lmtKind"] = zh_course.get("lmtKind", item["lmtKind"])
+            lmt_kind = zh_course.get("lmtKind", item["lmtKind"])
+            item["kind"] = self.convert_kind_to_int(
+                zh_course.get("subKind", ""), lmt_kind
+            )
+            item["core"] = 1 if zh_course.get("core", "") == "是" else 0
             item["lang"] = zh_course.get("langTpe", item["lang"])
             item["classroom"] = zh_course.get("subClassroom", item["classroom"])
             item["tranTpe"] = zh_course.get("tranTpe", item["tranTpe"])
@@ -219,6 +232,7 @@ class CoursesLegacySpider(scrapy.Spider):
             item["classroomId"] = en_course.get("subClassroom", item["classroom"])
             item["tranTpeEn"] = en_course.get("tranTpe", "")
             item["infoEn"] = en_course.get("info", "")
+            item["unitEn"] = en_course.get("subGde", "")
             item["noteEn"] = en_course.get("note", "")
 
         if course_data.get("teaSchmUrl"):

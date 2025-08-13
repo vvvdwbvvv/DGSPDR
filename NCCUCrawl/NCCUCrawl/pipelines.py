@@ -171,7 +171,7 @@ class SCSRSQLitePipeline:
             nameEn TEXT,
             teacher TEXT,
             teacherEn TEXT,
-            kind INTERGER,
+            kind INTEGER,
             time TEXT,
             timeEn TEXT,
             lmtKind TEXT,
@@ -701,6 +701,7 @@ class ETLPipeline:
         item = self._fix_data_types(item)
 
         return item
+
 
 class ETLPipelineLegacy:
     KIND_MAPPING = {
