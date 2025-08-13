@@ -5,7 +5,7 @@ from .courses_deprecated import CoursesLegacySpider
 
 class CourseRemainLegacySpider(CoursesLegacySpider):  # implement the course spider
     name = "remain_deprecated"
-#TODO: adjust the name
+    # TODO: adjust the name
     PROPERTY_NAME = {
         "專業基礎(開放系所)人數": "origin",
         "其他系所": "other_dept",
