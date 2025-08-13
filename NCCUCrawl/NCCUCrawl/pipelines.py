@@ -8,6 +8,7 @@
 import sqlite3
 from scrapy.exceptions import DropItem
 
+
 # mainly hard coding sql syntax: suggest folding it
 class SCSRSQLitePipeline:
     def open_spider(self, spider):
@@ -440,19 +441,19 @@ class SCSRSQLitePipeline:
         """
         self.cur.execute(sql, dict(i))
         self.conn.commit()
-    
+
     def upsert_course_legacy(self, i):
         """處理 CourseLegacyItem"""
         sql = """
         INSERT INTO course_legacy (
-            id, y, s, subNum, name, name_en, teacher, teacherEn,
+            id, y, s, subNum, name, nameEn, teacher, teacherEn,
             kind, time, timeEn, lmtKind, lmtKindEn, lang, langEn,
             semQty, classroom, classroomId, unit, unitEn,
             dp1, dp2, dp3, point, subRemainUrl, subSetUrl,
             subUnitRuleUrl, teaExpUrl, teaSchmUrl, tranTpe, tranTpeEn,
             info, infoEn, note, noteEn, syllabus, objective
         ) VALUES (
-            :id, :y, :s, :subNum, :name, :name_en, :teacher, :teacherEn,
+            :id, :y, :s, :subNum, :name, :nameEn, :teacher, :teacherEn,
             :kind, :time, :timeEn, :lmtKind, :lmtKindEn, :lang, :langEn,
             :semQty, :classroom, :classroomId, :unit, :unitEn,
             :dp1, :dp2, :dp3, :point, :subRemainUrl, :subSetUrl,
@@ -461,7 +462,7 @@ class SCSRSQLitePipeline:
         )
         ON CONFLICT(id) DO UPDATE SET 
             name         = excluded.name,
-            name_en      = excluded.name_en,
+            nameEn      = excluded.nameEn,
             teacher      = excluded.teacher,
             teacherEn    = excluded.teacherEn,
             kind         = excluded.kind,
@@ -520,7 +521,7 @@ class SCSRSQLitePipeline:
         """
         self.cur.execute(sql, dict(i))
         self.conn.commit()
-    
+
     def upsert_remain_legacy(self, i):
         """處理 RemainLegacyItem"""
         sql = """
@@ -600,6 +601,7 @@ class SCSRSQLitePipeline:
         """
         self.cur.execute(sql, dict(i))
         self.conn.commit()
+
 
 class ETLPipeline:
     LANGUAGE_MAPPING = {

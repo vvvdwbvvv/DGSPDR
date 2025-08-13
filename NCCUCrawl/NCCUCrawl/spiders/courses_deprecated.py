@@ -113,11 +113,17 @@ class CoursesSpider(scrapy.Spider):
             "1141",
         ]
 
-    def build_course_list_url(self, sem, dp1, dp2, dp3):
+    # also available at https://es.nccu.edu.tw/course/zh-TW/{id}/
+    def build_course_list(self, sem, dp1, dp2, dp3):
         return (
             "https://es.nccu.edu.tw/course/zh-TW/"
             f":sem={sem}%20:dp1={dp1}%20:dp2={dp2}%20:dp3={dp3}"  # ex: https://es.nccu.edu.tw/course/zh-TW/:sem=1131%20:dp1=01%20:dp2=A1%20:dp3=105%20/
         )
+    def build_course_detail_url_zh(self, course_id):
+        return f"http://es.nccu.edu.tw/course/zh-TW/{course_id}/"
+
+    def build_course_detail_url_en(self, course_id):
+        return f"http://es.nccu.edu.tw/course/en/{course_id}/"
 
     def process_course_item(self, item, course_data):
         yield item
@@ -126,25 +132,25 @@ class CoursesSpider(scrapy.Spider):
         """Create course item - can be extended by subclasses"""
         return CourseLegacyItem(
             id=f"{semester}{c['subNum']}",
-            y=semester[:3],  # 使用 y 而非 year
-            s=semester[3],   # 使用 s 而非 semester
+            y=semester[:3], 
+            s=semester[3], 
             subNum=c["subNum"],
             name=c["subNam"],
-            name_en=c.get("subNamEn", ""),
-            teacher=c.get("teaNam", ""),  # 添加教師名稱
-            teacherEn=c.get("teaNamEn", ""),  # 添加英文教師名稱
+            nameEn=c.get("subNamEn", ""), # from en api 
+            teacher=c.get("teaNam", ""),  
+            teacherEn=c.get("teaNamEn", ""),  # from en api 
             kind=c.get("subKind", ""),
             time=c.get("subTime", ""),
-            timeEn=c.get("subTimeEn", ""),  # 添加英文時間
+            timeEn=c.get("subTimeEn", ""),  # from en api 
             lmtKind=c.get("lmtKind", ""),
-            lmtKindEn=c.get("lmtKindEn", ""),
+            lmtKindEn=c.get("lmtKindEn", ""), # from en api 
             lang=c.get("langTpe", ""),
-            langEn=c.get("langTpeEn", ""),
+            langEn=c.get("langTpeEn", ""), # from en api 
             semQty=c.get("smtQty", ""),
             classroom=c.get("subClassroom", ""),
-            classroomId=c.get("subClassroomId", ""),
+            classroomId=c.get("subClassroomId", ""), # from en api 
             unit=unit_info.get("unit", ""),
-            unitEn=unit_info.get("unit_en", ""),
+            unitEn=unit_info.get("unit_en", ""), # from en api 
             dp1=c.get("dp1", ""),
             dp2=c.get("dp2", ""),
             dp3=c.get("dp3", ""),
@@ -155,13 +161,13 @@ class CoursesSpider(scrapy.Spider):
             teaExpUrl=c.get("teaExpUrl", ""),
             teaSchmUrl=c.get("teaSchmUrl", ""),
             tranTpe=c.get("tranTpe", ""),
-            tranTpeEn=c.get("tranTpeEn", ""),
+            tranTpeEn=c.get("tranTpeEn", ""), # from en api 
             info=c.get("info", ""),
-            infoEn=c.get("infoEn", ""),
+            infoEn=c.get("infoEn", ""), # from en api 
             note=c.get("note", ""),
-            noteEn=c.get("noteEn", ""),
+            noteEn=c.get("noteEn", ""), # from en api 
             syllabus="",  # In parse_syllabus
-            objective="", # In parse_syllabus
+            objective="",  # In parse_syllabus
         )
 
     def parse_course_list(self, response, semester, dp1, dp2, dp3):
@@ -170,27 +176,79 @@ class CoursesSpider(scrapy.Spider):
         unit_info = self.unit_mapping.get(unit_key, {})
 
         for c in courses:
-            item = self.create_course_item(c, semester, unit_info)
+            item = self.create_course_item(c, semester, unit_info, dp1, dp2, dp3)
+            course_id = f"{semester}{c['subNum']}"
 
-            # deal with syllabus url
-            if c.get("teaSchmUrl"):
-                yield scrapy.Request(
-                    url=c["teaSchmUrl"],
-                    callback=self.parse_syllabus,
-                    meta={"item": item, "course_data": c},
-                )
-            else:
-                yield from self.process_course_item(item, c)
+            zh_url = self.build_course_detail_url_zh(course_id)
+            yield scrapy.Request(
+                url=zh_url,
+                callback=self.parse_course_detail_zh,
+                meta={
+                    "item": item, 
+                    "course_data": c, 
+                    "course_id": course_id,
+                    "semester": semester,
+                    "dp1": dp1,
+                    "dp2": dp2, 
+                    "dp3": dp3
+                },
+                dont_filter=True
+            )
+    def parse_course_detail_zh(self, response):
+        item = response.meta["item"]
+        course_id = response.meta["course_id"]
+
+        zh_data = json.loads(response.text)
+        if len(zh_data) == 1:
+            zh_course = zh_data[0]               
+            item["teacher"] = zh_course.get("teaNam", item["teacher"])
+            item["kind"] = zh_course.get("subKind", item["kind"])
+            item["time"] = zh_course.get("subTime", item["time"])
+            item["lmtKind"] = zh_course.get("lmtKind", item["lmtKind"])
+            item["lang"] = zh_course.get("langTpe", item["lang"])
+            item["classroom"] = zh_course.get("subClassroom", item["classroom"])
+            item["tranTpe"] = zh_course.get("tranTpe", item["tranTpe"])
+            item["info"] = zh_course.get("info", item["info"])
+            item["note"] = zh_course.get("note", item["note"])
+
+        en_url = self.build_course_detail_url_en(course_id)
+        yield scrapy.Request(
+            url=en_url,
+            callback=self.parse_course_detail_en,
+            meta=response.meta,
+            dont_filter=True
+        )
+
+    def parse_course_detail_en(self, response):
+        item = response.meta["item"]
+        course_data = response.meta["course_data"]
+        course_id = response.meta["course_id"]
+        
+        en_data = json.loads(response.text)
+        if len(en_data) == 1:
+            en_course = en_data[0]
+            item["nameEn"] = en_course.get("subNam", "")
+            item["teacherEn"] = en_course.get("teaNam", "")
+            item["timeEn"] = en_course.get("subTime", "")
+            item["lmtKindEn"] = en_course.get("lmtKind", "")
+            item["langEn"] = en_course.get("langTpe", "")
+            item["tranTpeEn"] = en_course.get("tranTpe", "")
+            item["infoEn"] = en_course.get("info", "")
+            item["noteEn"] = en_course.get("note", "")
+        
+        if course_data.get("teaSchmUrl"):
+            yield scrapy.Request(
+                url=course_data["teaSchmUrl"],
+                callback=self.parse_syllabus,
+                meta={"item": item, "course_data": course_data},
+            )
+        else:
+            yield from self.process_course_item(item, course_data)
 
     def parse_syllabus(self, response):
         """Parse syllabus page - can be extended by subclasses"""
         item = response.meta["item"]
         course_data = response.meta.get("course_data", {})
-
-        # Fetch course name in English
-        name_en = response.css("#CourseNameEn::text").get()
-        if name_en:
-            item["name_en"] = name_en.strip()
 
         # Fetch course objective
         objective_elements = response.css(
@@ -203,6 +261,6 @@ class CoursesSpider(scrapy.Spider):
 
         syllabus_content = response.css(".sylview-section").get()
         if syllabus_content:
-            item["syllabus"] = response.url  
+            item["syllabus"] = response.url
 
         yield from self.process_course_item(item, course_data)
