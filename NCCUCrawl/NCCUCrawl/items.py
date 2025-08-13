@@ -97,10 +97,11 @@ class CourseRemainItem(scrapy.Item):
 
 
 class RateItem(scrapy.Item):
-    course_id = scrapy.Field()  # FK → course.id
-    teacher_id = scrapy.Field()  # FK → teacher.id
+    courseId = scrapy.Field()  # FK → course.id
+    rowId = scrapy.Field()
+    teacherId = scrapy.Field()  # FK → teacher.id
     content = scrapy.Field()
-    content_en = scrapy.Field()
+    contentEn = scrapy.Field()
 
 
 class CourseLegacyItem(scrapy.Item):
