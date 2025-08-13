@@ -168,7 +168,7 @@ class SCSRSQLitePipeline:
             s TEXT,
             subNum TEXT,
             name TEXT,
-            name_en TEXT,
+            nameEn TEXT,
             teacher TEXT,
             teacherEn TEXT,
             kind TEXT,

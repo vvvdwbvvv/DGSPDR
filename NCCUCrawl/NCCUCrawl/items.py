@@ -109,7 +109,7 @@ class CourseLegacyItem(scrapy.Item):
     s = scrapy.Field()
     subNum = scrapy.Field()
     name = scrapy.Field()
-    name_en = scrapy.Field()
+    nameEn = scrapy.Field()
     teacher = scrapy.Field()
     teacherEn = scrapy.Field()
     kind = scrapy.Field()

@@ -3,7 +3,7 @@ import scrapy
 from NCCUCrawl.items import CourseLegacyItem
 
 
-class CoursesSpider(scrapy.Spider):
+class CoursesLegacySpider(scrapy.Spider):
     name = "courses_deprecated"
     custom_settings = {
         "DOWNLOAD_DELAY": 0.1,
@@ -53,7 +53,7 @@ class CoursesSpider(scrapy.Spider):
 
         for sem in semesters:
             for dp1, dp2, dp3 in categories:
-                url = self.build_course_list_url(sem, dp1, dp2, dp3)
+                url = self.build_course_list(sem, dp1, dp2, dp3)
                 yield scrapy.Request(
                     url=url,
                     callback=self.parse_course_list,
@@ -84,32 +84,6 @@ class CoursesSpider(scrapy.Spider):
 
     def get_semesters(self):
         return [
-            "1011",
-            "1012",
-            "1021",
-            "1022",
-            "1031",
-            "1032",
-            "1041",
-            "1042",
-            "1051",
-            "1052",
-            "1061",
-            "1062",
-            "1071",
-            "1072",
-            "1081",
-            "1082",
-            "1091",
-            "1092",
-            "1101",
-            "1102",
-            "1111",
-            "1112",
-            "1121",
-            "1122",
-            "1131",
-            "1132",
             "1141",
         ]
 
@@ -119,6 +93,7 @@ class CoursesSpider(scrapy.Spider):
             "https://es.nccu.edu.tw/course/zh-TW/"
             f":sem={sem}%20:dp1={dp1}%20:dp2={dp2}%20:dp3={dp3}"  # ex: https://es.nccu.edu.tw/course/zh-TW/:sem=1131%20:dp1=01%20:dp2=A1%20:dp3=105%20/
         )
+
     def build_course_detail_url_zh(self, course_id):
         return f"http://es.nccu.edu.tw/course/zh-TW/{course_id}/"
 
@@ -128,32 +103,32 @@ class CoursesSpider(scrapy.Spider):
     def process_course_item(self, item, course_data):
         yield item
 
-    def create_course_item(self, c, semester, unit_info):
+    def create_course_item(self, c, semester, unit_info, dp1, dp2, dp3):
         """Create course item - can be extended by subclasses"""
         return CourseLegacyItem(
             id=f"{semester}{c['subNum']}",
-            y=semester[:3], 
-            s=semester[3], 
+            y=semester[:3],
+            s=semester[3],
             subNum=c["subNum"],
             name=c["subNam"],
-            nameEn=c.get("subNamEn", ""), # from en api 
-            teacher=c.get("teaNam", ""),  
-            teacherEn=c.get("teaNamEn", ""),  # from en api 
+            nameEn=c.get("subNamEn", ""),  # from en api
+            teacher=c.get("teaNam", ""),
+            teacherEn=c.get("teaNamEn", ""),  # from en api
             kind=c.get("subKind", ""),
             time=c.get("subTime", ""),
-            timeEn=c.get("subTimeEn", ""),  # from en api 
+            timeEn=c.get("subTimeEn", ""),  # from en api
             lmtKind=c.get("lmtKind", ""),
-            lmtKindEn=c.get("lmtKindEn", ""), # from en api 
+            lmtKindEn=c.get("lmtKindEn", ""),  # from en api
             lang=c.get("langTpe", ""),
-            langEn=c.get("langTpeEn", ""), # from en api 
+            langEn=c.get("langTpeEn", ""),  # from en api
             semQty=c.get("smtQty", ""),
             classroom=c.get("subClassroom", ""),
-            classroomId=c.get("subClassroomId", ""), # from en api 
+            classroomId=c.get("subClassroomId", ""),  # from en api
             unit=unit_info.get("unit", ""),
-            unitEn=unit_info.get("unit_en", ""), # from en api 
-            dp1=c.get("dp1", ""),
-            dp2=c.get("dp2", ""),
-            dp3=c.get("dp3", ""),
+            unitEn=unit_info.get("unit_en", ""),  # from en api
+            dp1=dp1,
+            dp2=dp2,
+            dp3=dp3,
             point=float(c.get("subPoint", 0)) if c.get("subPoint") else None,
             subRemainUrl=c.get("subRemainUrl", ""),
             subSetUrl=c.get("subSetUrl", ""),
@@ -161,11 +136,11 @@ class CoursesSpider(scrapy.Spider):
             teaExpUrl=c.get("teaExpUrl", ""),
             teaSchmUrl=c.get("teaSchmUrl", ""),
             tranTpe=c.get("tranTpe", ""),
-            tranTpeEn=c.get("tranTpeEn", ""), # from en api 
+            tranTpeEn=c.get("tranTpeEn", ""),  # from en api
             info=c.get("info", ""),
-            infoEn=c.get("infoEn", ""), # from en api 
+            infoEn=c.get("infoEn", ""),  # from en api
             note=c.get("note", ""),
-            noteEn=c.get("noteEn", ""), # from en api 
+            noteEn=c.get("noteEn", ""),  # from en api
             syllabus="",  # In parse_syllabus
             objective="",  # In parse_syllabus
         )
@@ -184,23 +159,24 @@ class CoursesSpider(scrapy.Spider):
                 url=zh_url,
                 callback=self.parse_course_detail_zh,
                 meta={
-                    "item": item, 
-                    "course_data": c, 
+                    "item": item,
+                    "course_data": c,
                     "course_id": course_id,
                     "semester": semester,
                     "dp1": dp1,
-                    "dp2": dp2, 
-                    "dp3": dp3
+                    "dp2": dp2,
+                    "dp3": dp3,
                 },
-                dont_filter=True
+                dont_filter=True,
             )
+
     def parse_course_detail_zh(self, response):
         item = response.meta["item"]
         course_id = response.meta["course_id"]
 
         zh_data = json.loads(response.text)
         if len(zh_data) == 1:
-            zh_course = zh_data[0]               
+            zh_course = zh_data[0]
             item["teacher"] = zh_course.get("teaNam", item["teacher"])
             item["kind"] = zh_course.get("subKind", item["kind"])
             item["time"] = zh_course.get("subTime", item["time"])
@@ -216,14 +192,13 @@ class CoursesSpider(scrapy.Spider):
             url=en_url,
             callback=self.parse_course_detail_en,
             meta=response.meta,
-            dont_filter=True
+            dont_filter=True,
         )
 
     def parse_course_detail_en(self, response):
         item = response.meta["item"]
         course_data = response.meta["course_data"]
-        course_id = response.meta["course_id"]
-        
+
         en_data = json.loads(response.text)
         if len(en_data) == 1:
             en_course = en_data[0]
@@ -232,10 +207,11 @@ class CoursesSpider(scrapy.Spider):
             item["timeEn"] = en_course.get("subTime", "")
             item["lmtKindEn"] = en_course.get("lmtKind", "")
             item["langEn"] = en_course.get("langTpe", "")
+            item["classroomId"] = en_course.get("subClassroom", item["classroom"])
             item["tranTpeEn"] = en_course.get("tranTpe", "")
             item["infoEn"] = en_course.get("info", "")
             item["noteEn"] = en_course.get("note", "")
-        
+
         if course_data.get("teaSchmUrl"):
             yield scrapy.Request(
                 url=course_data["teaSchmUrl"],
@@ -259,8 +235,40 @@ class CoursesSpider(scrapy.Spider):
                 [text.strip() for text in objective_elements if text.strip()]
             )
 
-        syllabus_content = response.css(".sylview-section").get()
-        if syllabus_content:
-            item["syllabus"] = response.url
+        description_title = response.css(
+            "div.col-sm-7.sylview--mtop.col-p-6 h2.text-primary"
+        )
+        if description_title:
+            descriptions = []
+            # Get all siblings after the h2 title
+            siblings = description_title.xpath("following-sibling::*")
+
+            for sibling in siblings:
+                # Check if we hit the stop condition (row sylview-mtop fa-border class)
+                classes = sibling.css("::attr(class)").get()
+                if classes and set(["row", "sylview-mtop", "fa-border"]).issubset(
+                    set(classes.split())
+                ):
+                    break
+
+                # Extract text content and split by newlines
+                text_content = sibling.css("::text").getall()
+                for text in text_content:
+                    lines = [
+                        line.strip()
+                        for line in text.split("\n")
+                        if line.strip() and line.strip() != " "
+                    ]
+                    descriptions.extend(lines)
+
+            if descriptions:
+                item["syllabus"] = "\n".join(descriptions)
+            else:
+                item["syllabus"] = response.url
+        else:
+            # Fallback to just storing the URL if structure is different
+            syllabus_content = response.css(".sylview-section").get()
+            if syllabus_content:
+                item["syllabus"] = response.url
 
         yield from self.process_course_item(item, course_data)
