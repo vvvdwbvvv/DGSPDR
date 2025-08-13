@@ -1,46 +1,48 @@
 import os
+from typing import List
 from dotenv import load_dotenv
 
 load_dotenv()
 
-# Environment variables
-YEAR = os.getenv("YEAR") or ""
-SEM = os.getenv("SEM") or ""
-USERNAME = os.getenv("USERNAME") or ""
-PASSWORD = os.getenv("PASSWORD") or ""
 
-# Server configuration
-SERVER_URL = "http://es.nccu.edu.tw/"
+class Config:
+    def __init__(self):
+        # Environment variables
+        self.YEAR = os.getenv("YEAR", "")
+        self.SEM = os.getenv("SEM", "")
+        self.USERNAME = os.getenv("USERNAME", "")
+        self.PASSWORD = os.getenv("PASSWORD", "")
 
-# API endpoints
-SEM_API = SERVER_URL + "semester/"
-PERSON_API = SERVER_URL + "person/"
-COURSE_API = SERVER_URL + "course/"
-TRACE_API = SERVER_URL + "tracing/"
+        # Server configuration
+        self.SERVER_URL = "http://es.nccu.edu.tw/"
+        self.KEY = "angu1arjjlST@2019"
 
-# Combined year-semester
-YEAR_SEM = YEAR + SEM
+        # API endpoints
+        self.SEM_API = f"{self.SERVER_URL}semester/"
+        self.PERSON_API = f"{self.SERVER_URL}person/"
+        self.COURSE_API = f"{self.SERVER_URL}course/"
+        self.TRACE_API = f"{self.SERVER_URL}tracing/"
 
-# Course result semesters
-COURSERESULT_YEARSEM = ["1102", "1111", "1112", "1121"]
+        # Combined year-semester
+        self.YEAR_SEM = f"{self.YEAR}{self.SEM}"
+
+        # Course result semesters
+        self.COURSERESULT_YEARSEM = ["1102", "1111", "1112", "1121"]
+
+    def teacher_url(self, teacher_id: str, year_sem: str = None) -> str:
+        year_sem = year_sem or self.YEAR_SEM
+        return f"http://newdoc.nccu.edu.tw/teaschm/{year_sem}/statistic.jsp-tnum={teacher_id}.htm"
+
+    def course_rate_url(self, param: str, year_sem: str = None) -> str:
+        year_sem = year_sem or self.YEAR_SEM
+        return f"http://newdoc.nccu.edu.tw/teaschm/{year_sem}/{param}"
+
+    def get_rate_qry(self) -> List[str]:
+        rate_qry_env = os.getenv("RATE_QRY", "")
+        return rate_qry_env.split(",") if rate_qry_env else []
+
+    def courseresult_csv(self, sem: str) -> str:
+        return f"{sem}CourseResult.csv"
 
 
-def teacher_url(teacher_id: str, year_sem: str = YEAR_SEM) -> str:
-    """Generate teacher statistics URL"""
-    return f"http://newdoc.nccu.edu.tw/teaschm/{year_sem}/statistic.jsp-tnum={teacher_id}.htm"
-
-
-def course_rate_url(param: str, year_sem: str = YEAR_SEM) -> str:
-    """Generate course rate URL"""
-    return f"http://newdoc.nccu.edu.tw/teaschm/{year_sem}/{param}"
-
-
-def rate_qry() -> list:
-    """Get rate query parameters from environment"""
-    rate_qry_env = os.getenv("RATE_QRY", "")
-    return rate_qry_env.split(",") if rate_qry_env else []
-
-
-def courseresult_csv(sem: str) -> str:
-    """Generate course result CSV filename"""
-    return f"{sem}CourseResult.csv"
+config = Config()
