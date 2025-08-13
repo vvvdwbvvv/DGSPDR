@@ -16,3 +16,7 @@ courses:
 courses_legacy:
 	cd NCCUCrawl && \
 	python3 -m scrapy crawl courses_deprecated
+
+courses_smart:
+	cd NCCUCrawl && \
+	python3 -m scrapy crawl smart_courses -L INFO 
