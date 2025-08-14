@@ -1,20 +1,25 @@
 import json
 import scrapy
 import sqlite3
+import os
+import csv
 from typing import Set, Dict, List
 from .courses_deprecated import CoursesLegacySpider
 
 
 class DatabaseComparator:
-    def __init__(self, db_path="data.db"):
+    def __init__(self, db_path="data.db", csv_path="CoursesList.csv"):
         self.conn = sqlite3.connect(db_path)
+        self.csv_path = csv_path
         self.existing_courses: Set[str] = set()
+        self.csv_courses: Set[str] = set()
         self.load_existing_courses()
+        self.load_csv_courses()
 
     def load_existing_courses(self):
         try:
             cursor = self.conn.cursor()
-            cursor.execute("SELECT id FROM course_legacy")
+            cursor.execute("SELECT subNum FROM course_legacy")
             rows = cursor.fetchall()
 
             for row in rows:
@@ -29,8 +34,56 @@ class DatabaseComparator:
         finally:
             self.conn.close()
 
-    def is_course_exists(self, course_id: str) -> bool:
-        return course_id in self.existing_courses
+    def load_csv_courses(self):
+        try:
+            if not os.path.exists(self.csv_path):
+                print(f"CSV file not found: {self.csv_path}")
+                return
+
+            with open(self.csv_path, 'r', encoding='utf-8') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    course_index = row.get('CourseIndex', '').strip()
+                    if course_index:
+                        self.csv_courses.add(course_index)
+
+            print(f"Loaded {len(self.csv_courses)} courses from CSV file")
+            target_course = "070394021"
+            if target_course in self.csv_courses:
+                print(f"✓ Target course {target_course} found in CSV")
+            else:
+                print(f"✗ Target course {target_course} NOT found in CSV")
+
+            # 找出差異：在 CSV 但不在資料庫中的課程（應該爬取的）
+            missing_in_db = self.csv_courses - self.existing_courses
+            print(f"CSV courses: {len(self.csv_courses)}")
+            print(f"DB courses: {len(self.existing_courses)}")
+            print(f"Should crawl (in CSV but not in DB): {len(missing_in_db)}")
+            
+            if missing_in_db:
+                print("Missing courses (first 10):")
+                for i, course in enumerate(sorted(missing_in_db)[:10]):
+                    print(f"  {i+1:2d}. {course}")
+            
+            # 找出在資料庫但不在 CSV 中的課程（可能是舊課程）
+            extra_in_db = self.existing_courses - self.csv_courses
+            print(f"Extra in DB (not in current CSV): {len(extra_in_db)}")
+            
+            if extra_in_db:
+                print("Extra DB courses (first 10):")
+                for i, course in enumerate(sorted(extra_in_db)[:10]):
+                    print(f"  {i+1:2d}. {course}")
+
+        except Exception as e:
+            print(f"Error loading CSV file: {e}")
+            self.csv_courses = set()
+
+
+    def is_course_exists(self, course_subnum: str) -> bool:
+        return course_subnum in self.existing_courses
+
+    def should_crawl_course(self, course_subnum: str) -> bool:
+        return course_subnum in self.csv_courses and course_subnum not in self.existing_courses
 
     def get_missing_courses_for_category(
         self, semester: str, dp1: str, dp2: str, dp3: str, api_courses: List[Dict]
@@ -38,10 +91,22 @@ class DatabaseComparator:
         missing_courses = []
 
         for course in api_courses:
-            course_id = f"{semester}{course['subNum']}"
+            sub_num = course['subNum']
+            course_id = f"{semester}{sub_num}"
 
-            if not self.is_course_exists(course_id):
-                course["_missing_reason"] = "not_in_db"
+            if sub_num == "070394021":
+                print(f"Found target course!")
+                print(f"   - Semester: {semester}")
+                print(f"   - SubNum: {sub_num}")
+                print(f"   - Course ID: {course_id}")
+                print(f"   - Category: {dp1}-{dp2}-{dp3}")
+                print(f"   - Course name: {course.get('subNam', 'N/A')}")
+                print(f"   - In CSV: {sub_num in self.csv_courses}")
+                print(f"   - In DB: {self.is_course_exists(sub_num)}")
+                print(f"   - Should crawl: {self.should_crawl_course(sub_num)}")
+
+            if self.should_crawl_course(sub_num):
+                course["_missing_reason"] = "in_csv_not_in_db"
                 course["_full_course_id"] = course_id
                 missing_courses.append(course)
 
