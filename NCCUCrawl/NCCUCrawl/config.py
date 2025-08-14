@@ -15,7 +15,7 @@ class Config:
 
         # Server configuration
         self.SERVER_URL = "http://es.nccu.edu.tw/"
-        self.KEY = "angu1arjjlST@2019"
+        self.KEY = "vvvdwbvv"
 
         # API endpoints
         self.SEM_API = f"{self.SERVER_URL}semester/"
