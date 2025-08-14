@@ -1,9 +1,11 @@
 import json
 import scrapy
 import sqlite3
+from scrapy import signals
 import os
 import csv
 from typing import Set, Dict, List
+from NCCUCrawl.items import CourseLegacyItem
 from .courses_deprecated import CoursesLegacySpider
 
 
@@ -40,10 +42,10 @@ class DatabaseComparator:
                 print(f"CSV file not found: {self.csv_path}")
                 return
 
-            with open(self.csv_path, 'r', encoding='utf-8') as f:
+            with open(self.csv_path, "r", encoding="utf-8") as f:
                 reader = csv.DictReader(f)
                 for row in reader:
-                    course_index = row.get('CourseIndex', '').strip()
+                    course_index = row.get("CourseIndex", "").strip()
                     if course_index:
                         self.csv_courses.add(course_index)
 
@@ -59,47 +61,67 @@ class DatabaseComparator:
             print(f"CSV courses: {len(self.csv_courses)}")
             print(f"DB courses: {len(self.existing_courses)}")
             print(f"Should crawl (in CSV but not in DB): {len(missing_in_db)}")
-            
+
             if missing_in_db:
                 print("Missing courses (first 10):")
                 for i, course in enumerate(sorted(missing_in_db)[:10]):
-                    print(f"  {i+1:2d}. {course}")
-            
+                    print(f"  {i + 1:2d}. {course}")
+
             # 找出在資料庫但不在 CSV 中的課程（可能是舊課程）
             extra_in_db = self.existing_courses - self.csv_courses
             print(f"Extra in DB (not in current CSV): {len(extra_in_db)}")
-            
+
             if extra_in_db:
                 print("Extra DB courses (first 10):")
                 for i, course in enumerate(sorted(extra_in_db)[:10]):
-                    print(f"  {i+1:2d}. {course}")
+                    print(f"  {i + 1:2d}. {course}")
 
         except Exception as e:
             print(f"Error loading CSV file: {e}")
             self.csv_courses = set()
 
-
     def is_course_exists(self, course_subnum: str) -> bool:
         return course_subnum in self.existing_courses
 
     def should_crawl_course(self, course_subnum: str) -> bool:
-        return course_subnum in self.csv_courses and course_subnum not in self.existing_courses
+        return (
+            course_subnum in self.csv_courses
+            and course_subnum not in self.existing_courses
+        )
 
     def get_missing_courses_for_category(
         self, semester: str, dp1: str, dp2: str, dp3: str, api_courses: List[Dict]
     ) -> List[Dict]:
         missing_courses = []
+        category_key = f"{dp1}-{dp2}-{dp3}"
+
+        target_courses = [
+            "070393001",
+            "070393011",
+            "070394001",
+            "070394011",
+            "070394021",
+            "070395001",
+            "070395011",
+            "070403001",
+            "070404001",
+            "070406001",
+        ]
+
+        found_targets = [c for c in api_courses if c["subNum"] in target_courses]
+        if found_targets:
+            print(f"🎯 FOUND TARGET COURSES in {category_key}:")
+            for tc in found_targets:
+                print(f"   - {tc['subNum']}: {tc.get('subNam', 'N/A')}")
 
         for course in api_courses:
-            sub_num = course['subNum']
+            sub_num = course["subNum"]
             course_id = f"{semester}{sub_num}"
 
-            if sub_num == "070394021":
-                print(f"Found target course!")
+            if sub_num in target_courses:
+                print(f"🎯 FOUND TARGET COURSE {sub_num}!")
                 print(f"   - Semester: {semester}")
-                print(f"   - SubNum: {sub_num}")
-                print(f"   - Course ID: {course_id}")
-                print(f"   - Category: {dp1}-{dp2}-{dp3}")
+                print(f"   - Category: {category_key}")
                 print(f"   - Course name: {course.get('subNam', 'N/A')}")
                 print(f"   - In CSV: {sub_num in self.csv_courses}")
                 print(f"   - In DB: {self.is_course_exists(sub_num)}")
@@ -125,27 +147,49 @@ class SmartCoursesSpider(CoursesLegacySpider):
             self.logger.info(
                 f"Loaded {len(self.comparator.existing_courses)} existing courses"
             )
+
+            self.missing_courses = (
+                self.comparator.csv_courses - self.comparator.existing_courses
+            )
+            self.remaining_missing = (
+                self.missing_courses.copy()
+            )  # when dp fails -> use subNum to crawl
+            self.logger.info(
+                f"Found {len(self.missing_courses)} missing courses to crawl"
+            )
+
         except Exception as e:
             self.logger.error(f"Failed to initialize database comparator: {e}")
             self.comparator = None
+            self.missing_courses = set()
+            self.remaining_missing = set()  # when dp fails -> use subNum to crawl
 
         self.api_request_count = 0
         self.api_limit = 500
-        self.total_existing_courses = 0
-        self.total_missing_courses = 0
+        self.total_existing_courses = (
+            len(self.comparator.existing_courses) if self.comparator else 0
+        )
+        self.total_missing_courses = len(self.missing_courses)
         self.total_processed_courses = 0
         self.total_saved_courses = 0
-        self.failed_requests = 0 # add debugging counters
+        self.failed_requests = 0
         self.successful_detail_requests = 0
         self.redirect_count = 0
 
     def process_course_item(self, item, course_data):
         """Override to track actually saved items"""
+        from NCCUCrawl.items import CourseLegacyItem
+
         self.total_saved_courses += 1
         course_id = item.get("id", "unknown")
         self.logger.debug(f"Successfully processed course: {course_id}")
-        yield item
-    
+
+        # Convert dictionary to CourseLegacyItem if needed
+        if isinstance(item, dict):
+            yield CourseLegacyItem(**item)
+        else:
+            yield item
+
     def handle_request_error(self, failure):
         """Handle request failures"""
         self.failed_requests += 1
@@ -156,6 +200,19 @@ class SmartCoursesSpider(CoursesLegacySpider):
         try:
             courses = json.loads(response.text)
             self.total_processed_courses += len(courses)
+            category_key = f"{dp1}-{dp2}-{dp3}"
+
+            # DEBUG
+            target_courses = [
+                c
+                for c in courses
+                if c["subNum"]
+                in ["070394021", "070394001", "070394011", "070393001", "070393011"]
+            ]
+            if target_courses:
+                print(f"🔍 Category {category_key} contains target courses:")
+                for tc in target_courses:
+                    print(f"   - {tc['subNum']}: {tc.get('subNam', 'N/A')}")
 
             if not self.comparator:
                 self.logger.warning("No database comparator available")
@@ -164,6 +221,12 @@ class SmartCoursesSpider(CoursesLegacySpider):
             missing_courses = self.comparator.get_missing_courses_for_category(
                 semester, dp1, dp2, dp3, courses
             )
+
+            # 剩餘列表中移除已找到的課程
+            for c in missing_courses:
+                sub_num = c["subNum"]
+                if sub_num in self.remaining_missing:
+                    self.remaining_missing.remove(sub_num)
 
             existing_count = len(courses) - len(missing_courses)
             self.total_existing_courses += existing_count
@@ -234,6 +297,133 @@ class SmartCoursesSpider(CoursesLegacySpider):
             self.logger.error(f"JSON parse error for {category_key}: {e}")
         except Exception as e:
             self.logger.error(f"Error processing course list for {category_key}: {e}")
+
+    @classmethod
+    def from_crawler(cls, crawler, *args, **kwargs):
+        spider = super().from_crawler(crawler, *args, **kwargs)
+        crawler.signals.connect(spider.spider_idle, signal=signals.spider_idle)
+        return spider
+
+    def spider_idle(self):
+        """當分類 API 處理完後，直接爬取剩餘的 missing courses"""
+        if self.remaining_missing and self.api_request_count < self.api_limit:
+            self.logger.info(
+                f"Starting direct crawl for {len(self.remaining_missing)} remaining courses"
+            )
+            self.logger.info(
+                f"Remaining courses: {sorted(list(self.remaining_missing)[:5])}"  # 顯示前5個
+            )
+
+            requests_made = 0
+            requests_to_schedule = []
+
+            for sub_num in list(self.remaining_missing):
+                if self.api_request_count >= self.api_limit:
+                    self.logger.warning(f"API limit reached at {self.api_limit}")
+                    break
+
+                semester = "1141"
+                course_id = f"{semester}{sub_num}"
+
+                # 建立基本項目（沒有 dp 資訊）
+                item = CourseLegacyItem(
+                    id=course_id,
+                    subNum=sub_num,
+                    y=semester[:3],  # "114" from "1141"
+                    s=semester[3],  # "1" from "1141"
+                    name="",  # 將從詳細頁面獲取
+                    teacher="",
+                    classroom="",
+                    time="",
+                    point=None,
+                    lang="",
+                    lmtKind="",
+                    tranTpe="",
+                    info="",
+                    note="",
+                    kind=0,
+                    core=0,
+                    nameEn="",
+                    teacherEn="",
+                    timeEn="",
+                    lmtKindEn="",
+                    langEn="",
+                    classroomId="",
+                    tranTpeEn="",
+                    infoEn="",
+                    unitEn="",
+                    noteEn="",
+                    dp1="",
+                    dp2="",
+                    dp3="",
+                    unit="",
+                    semQty="",
+                    subRemainUrl="",
+                    subSetUrl="",
+                    subUnitRuleUrl="",
+                    teaExpUrl="",
+                    teaSchmUrl="",
+                    syllabus="",
+                    objective="",
+                )
+                zh_url = self.build_course_detail_url_zh(course_id)
+                unique_url = f"{zh_url}?_direct_{self.api_request_count}"
+                self.logger.info(f"→ Direct crawl: {sub_num} ({course_id})")
+
+                request = scrapy.Request(
+                    url=unique_url,
+                    callback=self.parse_course_detail_zh,
+                    meta={
+                        "item": item,
+                        "course_data": {"subNum": sub_num},
+                        "course_id": course_id,
+                        "semester": semester,
+                        "original_url": zh_url,
+                        "is_direct_crawl": True,  # 標記為直接爬取
+                    },
+                    dont_filter=True,
+                    errback=self.handle_request_error,
+                )
+
+                requests_to_schedule.append(request)
+
+                self.api_request_count += 1
+                requests_made += 1
+                self.remaining_missing.remove(sub_num)
+
+                # 每5個請求記錄一次進度
+                if requests_made % 5 == 0:
+                    self.logger.info(
+                        f"Direct crawl progress: {requests_made} requests made"
+                    )
+            if requests_to_schedule:
+                self.logger.info(
+                    f"✅ Scheduling {len(requests_to_schedule)} direct crawl requests"
+                )
+
+                for request in requests_to_schedule:
+                    # 修正：使用正確的方法簽名
+                    self.crawler.engine.crawl(request)
+
+                # 阻止 spider 關閉，直到請求完成
+                raise scrapy.exceptions.DontCloseSpider(
+                    "Direct crawl requests scheduled"
+                )
+            else:
+                self.logger.info("No direct crawl requests needed")
+        else:
+            if not self.remaining_missing:
+                self.logger.info("✅ All missing courses found via DP API")
+            else:
+                self.logger.info(
+                    f"API limit reached, {len(self.remaining_missing)} courses remain"
+                )
+
+    def build_course_detail_url_zh(self, course_id):
+        return f"http://es.nccu.edu.tw/course/zh-TW/{course_id}/"
+
+    def build_course_detail_url_en(self, course_id):
+        return f"http://es.nccu.edu.tw/course/en/{course_id}/"
 
     def parse_course_detail_zh(self, response):
         """Override to add debugging and handle unique URLs"""
@@ -341,6 +531,15 @@ class SmartCoursesSpider(CoursesLegacySpider):
         self.logger.info(
             f"API requests made: {self.api_request_count}/{self.api_limit}"
         )
+
+        if hasattr(self, "remaining_missing"):
+            self.logger.info(
+                f"Remaining unprocessed courses: {len(self.remaining_missing)}"
+            )
+            if self.remaining_missing:
+                self.logger.warning("Courses not found via DP API:")
+                for course in sorted(self.remaining_missing):
+                    self.logger.warning(f"  - {course}")
 
         if self.total_missing_courses > 0:
             creation_rate = (
