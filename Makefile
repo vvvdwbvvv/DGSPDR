@@ -23,6 +23,10 @@ courses_smart:
 
 hotfix:
 	cd NCCUCrawl && \
-	python3 -m scrapy crawl smart_courses -L INFO
-	sqlite3 data.db ".dump COURSE" > output.sql
+	python3 -m scrapy crawl smart_courses -L INFO && \
+	sqlite3 data.db ".dump COURSE" > output.sql && \
 	python3 quickfix.py
+
+teacher:
+	cd NCCUCrawl && \
+	python3 -m scrapy crawl teacher_deprecated -L INFO
