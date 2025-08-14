@@ -370,12 +370,17 @@ class SmartCoursesSpider(CoursesLegacySpider):
                 unique_url = f"{zh_url}?_direct_{self.api_request_count}"
                 self.logger.info(f"→ Direct crawl: {sub_num} ({course_id})")
 
+                course_data = {
+                    "subNum": sub_num,
+                    "is_direct_crawl": True,  # 標記為直接爬取
+                }
+
                 request = scrapy.Request(
                     url=unique_url,
                     callback=self.parse_course_detail_zh,
                     meta={
                         "item": item,
-                        "course_data": {"subNum": sub_num},
+                        "course_data": course_data,
                         "course_id": course_id,
                         "semester": semester,
                         "original_url": zh_url,
@@ -429,6 +434,7 @@ class SmartCoursesSpider(CoursesLegacySpider):
         """Override to add debugging and handle unique URLs"""
         item = response.meta["item"]
         course_id = response.meta["course_id"]
+        course_data = response.meta["course_data"]
 
         if response.status != 200:
             self.failed_requests += 1
@@ -448,11 +454,23 @@ class SmartCoursesSpider(CoursesLegacySpider):
                 item["kind"] = self.convert_kind_to_int(
                     zh_course.get("subKind", item["lmtKind"])
                 )
+                item["name"] = zh_course.get("subNam", item["name"])
+                item["lmtKind"] = zh_course.get("lmtKind", item["lmtKind"])
                 item["time"] = zh_course.get("subTime", item["time"])
                 lmt_kind = zh_course.get("lmtKind", item["lmtKind"])
                 item["kind"] = self.convert_kind_to_int(
                     zh_course.get("subKind", ""), lmt_kind
                 )
+                item["unit"] = zh_course.get("subGde", item["unit"])
+                item["point"] = zh_course.get("subPoint", item["point"])
+                item["subRemainUrl"] = zh_course.get("subRemainUrl", "")
+                item["subSetUrl"] = zh_course.get("subSetUrl", "")
+                item["subUnitRuleUrl"] = zh_course.get("subUnitRuleUrl", "")
+                item["teaExpUrl"] = zh_course.get("teaExpUrl", "")
+                tea_schm_url = zh_course.get("teaSchmUrl", "")
+                item["teaSchmUrl"] = tea_schm_url
+                course_data["teaSchmUrl"] = tea_schm_url
+                item["semQty"] = zh_course.get("smtQty", item["semQty"])
                 item["core"] = 1 if zh_course.get("core", "") == "是" else 0
                 item["lang"] = zh_course.get("langTpe", item["lang"])
                 item["classroom"] = zh_course.get("subClassroom", item["classroom"])
@@ -487,7 +505,7 @@ class SmartCoursesSpider(CoursesLegacySpider):
                 en_course = en_data[0]
                 item["nameEn"] = en_course.get("subNam", "")
                 item["teacherEn"] = en_course.get("teaNam", "")
-                item["timeEn"] = en_course.get("subTime", "")
+                item["timeEn"] = en_course.get("sumkbTime", "")
                 item["lmtKindEn"] = en_course.get("lmtKind", "")
                 item["langEn"] = en_course.get("langTpe", "")
                 item["classroomId"] = en_course.get("subClassroom", item["classroom"])
@@ -496,9 +514,14 @@ class SmartCoursesSpider(CoursesLegacySpider):
                 item["unitEn"] = en_course.get("subGde", "")
                 item["noteEn"] = en_course.get("note", "")
 
-            if course_data.get("teaSchmUrl"):
+            tea_schm_url = course_data.get("teaSchmUrl", "")
+            item_tea_schm_url = item.get("teaSchmUrl", "")  # DEBUG
+
+            final_tea_schm_url = item_tea_schm_url or tea_schm_url
+
+            if final_tea_schm_url:
                 yield scrapy.Request(
-                    url=course_data["teaSchmUrl"],
+                    url=final_tea_schm_url,
                     callback=self.parse_syllabus,
                     meta={"item": item, "course_data": course_data},
                     dont_filter=True,
@@ -518,6 +541,58 @@ class SmartCoursesSpider(CoursesLegacySpider):
                 )
             else:
                 yield from self.process_course_item(item, course_data)
+
+    def parse_syllabus(self, response):
+        """Parse syllabus page - can be extended by subclasses"""
+        item = response.meta["item"]
+        course_data = response.meta.get("course_data", {})
+
+        # Fetch course objective
+        objective_elements = response.css(
+            "body > div.container.sylview-section > div > div > div > p::text"
+        ).getall()
+        if objective_elements:
+            item["objective"] = " ".join(
+                [text.strip() for text in objective_elements if text.strip()]
+            )
+
+        description_title = response.css(
+            "div.col-sm-7.sylview--mtop.col-p-6 h2.text-primary"
+        )
+        if description_title:
+            descriptions = []
+            # Get all siblings after the h2 title
+            siblings = description_title.xpath("following-sibling::*")
+
+            for sibling in siblings:
+                # Check if we hit the stop condition (row sylview-mtop fa-border class)
+                classes = sibling.css("::attr(class)").get()
+                if classes and set(["row", "sylview-mtop", "fa-border"]).issubset(
+                    set(classes.split())
+                ):
+                    break
+
+                # Extract text content and split by newlines
+                text_content = sibling.css("::text").getall()
+                for text in text_content:
+                    lines = [
+                        line.strip()
+                        for line in text.split("\n")
+                        if line.strip() and line.strip() != " "
+                    ]
+                    descriptions.extend(lines)
+
+            if descriptions:
+                item["syllabus"] = "\n".join(descriptions)
+            else:
+                item["syllabus"] = response.url
+        else:
+            # Fallback to just storing the URL if structure is different
+            syllabus_content = response.css(".sylview-section").get()
+            if syllabus_content:
+                item["syllabus"] = response.url
+
+        yield from self.process_course_item(item, course_data)
 
     def closed(self, reason):
         self.logger.info("=== Smart Courses Spider Statistics ===")
