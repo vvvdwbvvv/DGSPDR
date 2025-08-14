@@ -20,3 +20,9 @@ courses_legacy:
 courses_smart:
 	cd NCCUCrawl && \
 	python3 -m scrapy crawl smart_courses -L INFO 
+
+hotfix:
+	cd NCCUCrawl && \
+	python3 -m scrapy crawl smart_courses -L INFO
+	sqlite3 data.db ".dump COURSE" > output.sql
+	python3 quickfix.py
