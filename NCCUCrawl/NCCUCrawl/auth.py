@@ -1,11 +1,12 @@
-from urllib.parse import quote, urljoin
-import ssl
-from typing import Optional
+import re
+from typing import Optional, Tuple
+from urllib.parse import urljoin
 from base64 import b64decode, b64encode
-from pyDes import des, ECB, PAD_PKCS5
+import ssl
 import requests
-from .config import Config
 from requests.adapters import HTTPAdapter
+from pyDes import des, ECB, PAD_PKCS5
+from .config import Config
 
 
 class Authenticate:
@@ -14,14 +15,20 @@ class Authenticate:
         self._username = username or self.config.USERNAME
         self._password = password or self.config.PASSWORD
         self._token: Optional[str] = None
+        self._auth_debug: str = ""
+
+        if not self._username or not self._password:
+            raise Exception("Username or password not found in environment")
+
+        # DES key and cipher
         self._des_key = self._derive_des_key(self.config.KEY)
         self._des = des(self._des_key, ECB, padmode=PAD_PKCS5)
+
+        # Requests session with legacy TLS enabled
         self._session = requests.Session()
         self._mount_legacy_tls_adapter()
 
-        if not self._username or not self._password:
-            raise Exception("Username or password not found")
-
+        # Authenticate and set token
         self._authenticate()
 
     def _derive_des_key(self, key) -> bytes:
@@ -30,54 +37,47 @@ class Authenticate:
           - bytes of length 8
           - base64 string that decodes to 8 bytes
           - hex string that decodes to 8 bytes
-          - 8-char ASCII/UTF-8 string
+          - 8-char ASCII/UTF-8/latin1 string
         """
         if isinstance(key, bytes):
             if len(key) == 8:
                 return key
-            raise ValueError("Invalid DES key size. Key must be exactly 8 bytes long.")
+            raise ValueError("Config.KEY bytes must be exactly 8 bytes")
+
         if not isinstance(key, str):
-            raise ValueError("DES key must be bytes or string.")
+            raise ValueError("Config.KEY must be bytes or str")
 
         # Try base64
         try:
-            kb = b64decode(key, validate=True)
-            if len(kb) == 8:
-                return kb
+            b = b64decode(key, validate=True)
+            if len(b) == 8:
+                return b
         except Exception:
             pass
 
         # Try hex
         try:
-            kb = bytes.fromhex(key)
-            if len(kb) == 8:
-                return kb
+            b = bytes.fromhex(key)
+            if len(b) == 8:
+                return b
         except Exception:
             pass
 
+        # Try encodings
         for enc in ("utf-8", "ascii", "latin-1"):
             try:
-                kb = key.encode(enc)
-                if len(kb) == 8:
-                    return kb
+                b = key.encode(enc)
+                if len(b) == 8:
+                    return b
             except Exception:
                 pass
 
-        raise ValueError(
-            "Invalid DES key size. Config.KEY must be exactly 8 bytes. "
-            "Use an 8-char ASCII string or provide a base64/hex value that decodes to 8 bytes."
-        )
+        raise ValueError("Invalid DES key size. KEY must decode to exactly 8 bytes.")
 
     def _mount_legacy_tls_adapter(self) -> None:
-        """
-        Mount an HTTPS adapter that allows legacy server connections
-        (needed for servers requiring unsafe legacy renegotiation).
-        """
-
         class LegacyTLSAdapter(HTTPAdapter):
             def init_poolmanager(self, *args, **kwargs):
                 ctx = ssl.create_default_context()
-                # Allow legacy servers (OpenSSL: OP_LEGACY_SERVER_CONNECT)
                 if hasattr(ssl, "OP_LEGACY_SERVER_CONNECT"):
                     ctx.options |= ssl.OP_LEGACY_SERVER_CONNECT
                 kwargs["ssl_context"] = ctx
@@ -93,31 +93,37 @@ class Authenticate:
         self._session.mount("https://", LegacyTLSAdapter())
 
     def _des_encrypt(self, source: str) -> str:
-        # Use bytes input and reuse the DES object
-        des_result = self._des.encrypt(source.encode("utf-8"))
-        return b64encode(des_result).decode("ascii")
+        ct = self._des.encrypt(source.encode("utf-8"))
+        return b64encode(ct).decode("ascii")
 
     def _authenticate(self) -> None:
-        source = (
-            f"aNgu1ar%!{self._username}X_X{self._password}!%ASjjLInGH:lkjhdsa:)_l0OK"
-        )
+        source = f"aNgu1ar%!{self._username}X_X{self._password}!%ASjjLInGH:lkjhdsa:)_l0OK"
         encrypted_data = self._des_encrypt(source)
-        # Keep raw base64 (server appears to expect slashes in the path)
-        enc_path = encrypted_data
 
         headers = {
             "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
             "Accept": "application/json, text/plain, */*",
             "Referer": self.config.SERVER_URL,
+            "Origin": self.config.SERVER_URL.rstrip("/"),
+            "X-Requested-With": "XMLHttpRequest",
             "Accept-Language": "zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7",
         }
 
         try:
-            response = self._try_person_endpoints(enc_path, headers)
-            data = response.json()
-            if not data:
-                raise Exception("Empty response from login API")
-            self._token = data[0]["encstu"]
+            resp, trace = self._try_person_endpoints(encrypted_data, headers)
+            ctype = resp.headers.get("Content-Type", "")
+            snippet = ""
+            try:
+                snippet = (resp.text or "")[:300]
+            except Exception:
+                pass
+            self._auth_debug = f"{trace} | final={resp.status_code} {ctype} | body={snippet}"
+
+            resp.raise_for_status()
+            token = self._extract_token(resp)
+            if not token:
+                raise Exception("Token not found in response")
+            self._token = token
 
         except requests.exceptions.SSLError as e:
             if "UNSAFE_LEGACY_RENEGOTIATION_DISABLED" in str(e):
@@ -125,8 +131,38 @@ class Authenticate:
                     "TLS requires UnsafeLegacyRenegotiation. Set OPENSSL_CONF to a config with 'Options = UnsafeLegacyRenegotiation' and rerun."
                 ) from e
             raise
-        except (requests.RequestException, KeyError, IndexError) as e:
-            raise Exception(f"Authentication failed: {str(e)}")
+        except Exception as e:
+            raise Exception(f"Authentication failed: {e}. Trace={self._auth_debug}")
+        
+    def _extract_token(self, resp: requests.Response) -> Optional[str]:
+        # Try JSON list: [ { "encstu": "..." } ]
+        try:
+            data = resp.json()
+            if isinstance(data, list) and data:
+                v = data[0]
+                if isinstance(v, dict) and "encstu" in v and v["encstu"]:
+                    return str(v["encstu"])
+            if isinstance(data, dict):
+                # { "encstu": "..." } or { "data": [ { "encstu": "..." } ] }
+                if "encstu" in data and data["encstu"]:
+                    return str(data["encstu"])
+                if "data" in data and isinstance(data["data"], list) and data["data"]:
+                    v = data["data"][0]
+                    if isinstance(v, dict) and "encstu" in v and v["encstu"]:
+                        return str(v["encstu"])
+        except Exception:
+            pass
+
+        # Fallback: regex from text
+        try:
+            txt = resp.text or ""
+            m = re.search(r'"encstu"\s*:\s*"([^"]+)"', txt)
+            if m:
+                return m.group(1)
+        except Exception:
+            pass
+
+        return None
 
     def _post_with_manual_redirects(
         self,
@@ -137,11 +173,10 @@ class Authenticate:
         json=None,
         timeout: int = 15,
         max_redirects: int = 5,
-    ) -> requests.Response:
-        """
-        Send POST but handle redirects manually to preserve method and body.
-        """
+    ) -> Tuple[requests.Response, str]:
+        steps = []
         current_url = url
+        last = None
         for _ in range(max_redirects):
             resp = self._session.post(
                 current_url,
@@ -151,92 +186,70 @@ class Authenticate:
                 timeout=timeout,
                 allow_redirects=False,
             )
+            last = resp
+            steps.append(f"POST {current_url} -> {resp.status_code}")
             if resp.status_code in (301, 302, 303, 307, 308):
                 loc = resp.headers.get("Location")
                 if not loc:
-                    return resp
+                    break
                 current_url = urljoin(current_url, loc)
-                # continue loop and re-POST to the redirected URL
                 continue
-            return resp
-        return resp  # return last response after exceeding redirects
+            break
+        return (last or resp), " | ".join(steps)
 
-    def _try_person_endpoints(self, enc_path: str, headers: dict) -> requests.Response:
-        """
-        Prefer POST (server Allow=POST). Try multiple shapes before failing, preserving POST on redirects.
-        """
+    def _try_person_endpoints(self, enc_path: str, headers: dict) -> Tuple[requests.Response, str]:
         urls = [
             f"{self.config.PERSON_API}{enc_path}",
             f"{self.config.PERSON_API}{enc_path}/",
             f"{self.config.PERSON_API}",
         ]
+        traces = []
 
-        last = None
-
-        # 1) POST to path with/without trailing slash, no body (preserve POST across redirects)
+        # Prefer POST to path (no body)
         for url in urls[:2]:
-            resp = self._post_with_manual_redirects(url, headers, timeout=15)
+            resp, tr = self._post_with_manual_redirects(url, headers, timeout=15)
+            traces.append(tr)
             if resp.status_code == 200:
-                return resp
-            last = (url, "POST(no-body)", resp)
+                return resp, " || ".join(traces)
 
-        # 2) POST form to base endpoint (common patterns)
+        # Try form to base
         for key in ("q", "data", "token"):
-            resp = self._post_with_manual_redirects(
-                urls[2], headers, data={key: enc_path}, timeout=15
-            )
+            resp, tr = self._post_with_manual_redirects(urls[2], headers, data={key: enc_path}, timeout=15)
+            traces.append(tr)
             if resp.status_code == 200:
-                return resp
-            last = (urls[2], f"POST(form) {key}", resp)
+                return resp, " || ".join(traces)
 
-        # 3) POST JSON to base endpoint
+        # Try JSON to base
         json_headers = {**headers, "Content-Type": "application/json"}
         for key in ("q", "data", "token"):
-            resp = self._post_with_manual_redirects(
-                urls[2], json_headers, json={key: enc_path}, timeout=15
-            )
+            resp, tr = self._post_with_manual_redirects(urls[2], json_headers, json={key: enc_path}, timeout=15)
+            traces.append(tr)
             if resp.status_code == 200:
-                return resp
-            last = (urls[2], f"POST(json) {key}", resp)
+                return resp, " || ".join(traces)
 
-        # 4) As a last resort, try GET (with/without slash)
-        for url in urls[:2]:
-            resp = self._session.get(
-                url, headers=headers, timeout=15, allow_redirects=True
-            )
-            if resp.status_code == 200:
-                return resp
-            last = (url, "GET", resp)
-
-        if last:
-            url, how, resp = last
-            snippet = (resp.text or "")[:300]
-            raise Exception(
-                f"Authentication failed: {resp.status_code} {resp.reason} via {how} at {url}. "
-                f"Allow={resp.headers.get('Allow', '')}. Body: {snippet}"
-            )
-
-        raise Exception("Authentication failed: unexpected empty response chain")
+        return resp, " || ".join(traces)
 
     def get_addtrack_url(self, course_id: str) -> str:
         source = f"aNgu1ar%!{course_id}!%ASjjLInGH:lkjhdsa"
         encrypted_data = self._des_encrypt(source)
-        enc_seg = quote(encrypted_data, safe="")
-        return f"{self.config.TRACE_API}C/zh-TW/3{enc_seg}-{self._token}/"
+        return f"{self.config.TRACE_API}C/zh-TW/3{encrypted_data}-{self._token or 'ERROR'}/"
 
     def get_deltrack_url(self, course_id: str) -> str:
         source = f"aNgu1ar%!{course_id}!%ASjjLInGH:lkjhdsa"
         encrypted_data = self._des_encrypt(source)
-        enc_seg = quote(encrypted_data, safe="")
-        return f"{self.config.TRACE_API}D/zh-TW/{enc_seg}-{self._token}/"
+        return f"{self.config.TRACE_API}D/zh-TW/{encrypted_data}-{self._token or 'ERROR'}/"
 
     def get_track_url(self) -> str:
-        return f"{self.config.TRACE_API}zh-TW/{self._token}/"
+        return f"{self.config.TRACE_API}zh-TW/{self._token or 'ERROR'}/"
 
     @property
     def token(self) -> Optional[str]:
         return self._token
 
     @property
-    def username(self) -> str:
-        return self._username
+    def debug(self) -> str:
+        return self._auth_debug
+
+    @property
+    def session(self) -> requests.Session:
+        return self._session
