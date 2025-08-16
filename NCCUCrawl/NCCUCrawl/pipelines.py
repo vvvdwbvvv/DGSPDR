@@ -6,23 +6,53 @@
 
 # useful for handling different item types with a single interface
 import sqlite3
+
 from scrapy.exceptions import DropItem
 
 
 # mainly hard coding sql syntax: suggest folding it
 class SCSRSQLitePipeline:
+    def __init__(self):
+        """Initialize the pipeline with None values for database connections."""
+        self._conn: sqlite3.Connection | None = None
+        self._cur: sqlite3.Cursor | None = None
+        self._initialized = False
+
+    @property
+    def conn(self) -> sqlite3.Connection:
+        """Database connection property."""
+        if not self._initialized:
+            raise RuntimeError(
+                "Database not initialized. This usually means open_spider() hasn't been called yet."
+            )
+
+        assert self._conn is not None
+        return self._conn
+
+    @property
+    def cur(self) -> sqlite3.Cursor:
+        """Database cursor property."""
+        if not self._initialized:
+            raise RuntimeError(
+                "Database not initialized. This usually means open_spider() hasn't been called yet."
+            )
+
+        assert self._cur is not None
+        return self._cur
+
     def open_spider(self, spider):
         """Open a connection to the SQLite database."""
-        self.conn = sqlite3.connect("data.db")
-        self.cur = self.conn.cursor()
-        self.cur.execute("PRAGMA journal_mode = WAL")
-        self.cur.execute("PRAGMA synchronous = NORMAL")
+        self._conn = sqlite3.connect("data.db")
+        self._cur = self._conn.cursor()
+        self._cur.execute("PRAGMA journal_mode = WAL")
+        self._cur.execute("PRAGMA synchronous = NORMAL")
 
         self.create_tables()
 
     def close_spider(self, spider):
-        self.conn.commit()
-        self.conn.close()
+        if self.conn:
+            self.conn.commit()
+            self.conn.close()
 
     def process_item(self, item, spider):
         if item.__class__.__name__ == "TeacherItem":
@@ -39,8 +69,8 @@ class SCSRSQLitePipeline:
             self.upsert_teacher_legacy(item)
         elif item.__class__.__name__ == "RateLegacyItem":
             self.upsert_rate_legacy(item)
-        elif item.__class__.__name__ == "ResultItem":
-            self.upsert_result(item)
+        # elif item.__class__.__name__ == "ResultItem":
+        #     self.upsert_result(item)
         elif item.__class__.__name__ == "RemainLegacyItem":
             self.upsert_remain_legacy(item)
         else:
@@ -292,7 +322,7 @@ class SCSRSQLitePipeline:
         sql = """
         INSERT INTO teacher (id, name, name_en, department, first_appear)
         VALUES (:id, :name, :name_en, :department, :first_appear)
-        ON CONFLICT(id) DO UPDATE SET 
+        ON CONFLICT(id) DO UPDATE SET
             name          = excluded.name,
             name_en       = excluded.name_en,
             department    = excluded.department,
@@ -318,7 +348,7 @@ class SCSRSQLitePipeline:
             :note, :note_en, :syllabus, :syllabus_en, :objective, :objective_en,
             :core, :discipline, :last_enroll, :student_limit, :student_count
         )
-        ON CONFLICT(id) DO UPDATE SET 
+        ON CONFLICT(id) DO UPDATE SET
             name                = excluded.name,
             name_en             = excluded.name_en,
             kind                = excluded.kind,
@@ -461,7 +491,7 @@ class SCSRSQLitePipeline:
             :subUnitRuleUrl, :teaExpUrl, :teaSchmUrl, :tranTpe, :tranTpeEn,
             :info, :infoEn, :note, :noteEn, :syllabus, :objective
         )
-        ON CONFLICT(id) DO UPDATE SET 
+        ON CONFLICT(id) DO UPDATE SET
             name         = excluded.name,
             nameEn      = excluded.nameEn,
             teacher      = excluded.teacher,
@@ -505,7 +535,7 @@ class SCSRSQLitePipeline:
         sql = """
         INSERT INTO teacher_legacy (id, name)
         VALUES (:id, :name)
-        ON CONFLICT(id) DO UPDATE SET 
+        ON CONFLICT(id) DO UPDATE SET
             name = excluded.name;
         """
         self.cur.execute(sql, dict(i))
@@ -516,7 +546,7 @@ class SCSRSQLitePipeline:
         sql = """
         INSERT INTO rate_legacy (courseId, rowId, teacherId, content, contentEn)
         VALUES (:courseId, :rowId, :teacherId, :content, :contentEn)
-        ON CONFLICT(courseId, rowId) DO UPDATE SET 
+        ON CONFLICT(courseId, rowId) DO UPDATE SET
             teacherId = excluded.teacherId,
             content   = excluded.content,
             contentEn = excluded.contentEn;
@@ -526,6 +556,7 @@ class SCSRSQLitePipeline:
 
     def upsert_remain_legacy(self, i):
         """處理 RemainLegacyItem"""
+
         sql = """
         INSERT INTO remain_legacy (
             id, signableAdding, waitingList,
