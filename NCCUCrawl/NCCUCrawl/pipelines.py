@@ -46,6 +46,8 @@ class SCSRSQLitePipeline:
         self._cur = self._conn.cursor()
         self._cur.execute("PRAGMA journal_mode = WAL")
         self._cur.execute("PRAGMA synchronous = NORMAL")
+        
+        self._initialized = True
 
         self.create_tables()
 
