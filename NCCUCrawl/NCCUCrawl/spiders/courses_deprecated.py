@@ -81,7 +81,7 @@ class CoursesLegacySpider(scrapy.Spider):
 
     def generate_hierarchical_requests(self, units, semester):
         """生成階層式搜尋請求：三階層 → 二階層 → 一階層 → 零階層"""
-        
+
         # 1. 三階層搜尋 (dp1-dp2-dp3)
         three_level_categories = self.get_three_level_categories(units)
         for dp1, dp2, dp3 in three_level_categories:
@@ -90,11 +90,11 @@ class CoursesLegacySpider(scrapy.Spider):
                 url=url,
                 callback=self.parse_course_list,
                 cb_kwargs={
-                    "semester": semester, 
-                    "dp1": dp1, 
-                    "dp2": dp2, 
+                    "semester": semester,
+                    "dp1": dp1,
+                    "dp2": dp2,
                     "dp3": dp3,
-                    "search_level": "three_level"
+                    "search_level": "three_level",
                 },
                 meta={"search_level": "three_level"},
                 priority=100,  # 最高優先級
@@ -107,11 +107,11 @@ class CoursesLegacySpider(scrapy.Spider):
                 url=url,
                 callback=self.parse_course_list,
                 cb_kwargs={
-                    "semester": semester, 
-                    "dp1": dp1, 
-                    "dp2": dp2, 
+                    "semester": semester,
+                    "dp1": dp1,
+                    "dp2": dp2,
                     "dp3": "",
-                    "search_level": "two_level"
+                    "search_level": "two_level",
                 },
                 meta={"search_level": "two_level"},
                 priority=90,  # 第二優先級
@@ -124,11 +124,11 @@ class CoursesLegacySpider(scrapy.Spider):
                 url=url,
                 callback=self.parse_course_list,
                 cb_kwargs={
-                    "semester": semester, 
-                    "dp1": dp1, 
-                    "dp2": "", 
+                    "semester": semester,
+                    "dp1": dp1,
+                    "dp2": "",
                     "dp3": "",
-                    "search_level": "one_level"
+                    "search_level": "one_level",
                 },
                 meta={"search_level": "one_level"},
                 priority=80,  # 第三優先級
@@ -140,11 +140,11 @@ class CoursesLegacySpider(scrapy.Spider):
             url=url,
             callback=self.parse_course_list,
             cb_kwargs={
-                "semester": semester, 
-                "dp1": "", 
-                "dp2": "", 
+                "semester": semester,
+                "dp1": "",
+                "dp2": "",
                 "dp3": "",
-                "search_level": "zero_level"
+                "search_level": "zero_level",
             },
             meta={"search_level": "zero_level"},
             priority=70,  # 最低優先級
@@ -159,9 +159,11 @@ class CoursesLegacySpider(scrapy.Spider):
                     if l2["utCodL2"] != "0":
                         for l3 in l2["utL3"]:
                             if l3["utCodL3"] != "0":
-                                categories.append((l1["utCodL1"], l2["utCodL2"], l3["utCodL3"]))
+                                categories.append(
+                                    (l1["utCodL1"], l2["utCodL2"], l3["utCodL3"])
+                                )
         return categories
-    
+
     def get_two_level_categories(self, units):
         """取得所有二階層分類 (dp1-dp2)，去重複"""
         categories = set()
@@ -171,7 +173,7 @@ class CoursesLegacySpider(scrapy.Spider):
                     if l2["utCodL2"] != "0":
                         categories.add((l1["utCodL1"], l2["utCodL2"]))
         return list(categories)
-    
+
     def get_one_level_categories(self, units):
         """取得所有一階層分類 (dp1)，去重複"""
         categories = set()
@@ -179,7 +181,7 @@ class CoursesLegacySpider(scrapy.Spider):
             if l1["utCodL1"] != "0":
                 categories.add(l1["utCodL1"])
         return list(categories)
-    
+
     def get_categories(self, units):
         categories = []
         for l1 in units:
@@ -265,11 +267,13 @@ class CoursesLegacySpider(scrapy.Spider):
             objective="",  # In parse_syllabus
         )
 
-    def parse_course_list(self, response, semester, dp1, dp2, dp3, search_level="unknown"):
+    def parse_course_list(
+        self, response, semester, dp1, dp2, dp3, search_level="unknown"
+    ):
         courses = json.loads(response.text)
         self.search_stats[search_level]["categories"] += 1
         self.search_stats[search_level]["courses"] += len(courses)
-        
+
         if dp1 and dp2 and dp3:
             category_key = f"{dp1}-{dp2}-{dp3}"
             unit_info = self.unit_mapping.get(category_key, {})
@@ -286,14 +290,14 @@ class CoursesLegacySpider(scrapy.Spider):
 
         new_courses = []
         duplicate_count = 0
-        
+
         for c in courses:
-                course_id = f"{semester}{c['subNum']}"
-                if course_id not in self.processed_courses:
-                    new_courses.append(c)
-                    self.processed_courses.add(course_id)
-                else:
-                    duplicate_count += 1
+            course_id = f"{semester}{c['subNum']}"
+            if course_id not in self.processed_courses:
+                new_courses.append(c)
+                self.processed_courses.add(course_id)
+            else:
+                duplicate_count += 1
 
         # 更新統計
         self.search_stats[search_level]["new_courses"] += len(new_courses)
@@ -343,7 +347,7 @@ class CoursesLegacySpider(scrapy.Spider):
             if len(key_parts) == 3 and key_parts[0] == dp1:
                 return info
         return {}
-    
+
     def convert_kind_to_int(self, kind_str, lmt_kind_str=""):
         """Convert kind string to integer, considering lmtKind for special cases"""
         if lmt_kind_str:

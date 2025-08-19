@@ -90,7 +90,13 @@ class DatabaseComparator:
         )
 
     def get_missing_courses_for_category(
-        self, semester: str, dp1: str, dp2: str, dp3: str, api_courses: List[Dict], search_level: str = "unknown"
+        self,
+        semester: str,
+        dp1: str,
+        dp2: str,
+        dp3: str,
+        api_courses: List[Dict],
+        search_level: str = "unknown",
     ) -> List[Dict]:
         missing_courses = []
         category_key = f"{dp1}-{dp2}-{dp3}" if dp1 or dp2 or dp3 else "∅-∅-∅"
@@ -107,6 +113,7 @@ class DatabaseComparator:
                 missing_courses.append(course)
 
         return missing_courses
+
 
 class SmartCoursesSpider(CoursesLegacySpider):
     name = "smart_courses"
@@ -125,7 +132,7 @@ class SmartCoursesSpider(CoursesLegacySpider):
                 self.comparator.csv_courses - self.comparator.existing_courses
             )
             self.remaining_missing = self.missing_courses.copy()
-            
+
             self.logger.info(
                 f"Found {len(self.missing_courses)} missing courses to crawl"
             )
@@ -138,7 +145,7 @@ class SmartCoursesSpider(CoursesLegacySpider):
 
         self.scheduled_courses: Set[str] = set()
         self.successfully_processed: Set[str] = set()
-        
+
         self.api_request_count = 0
         self.detail_request_count = 0
         self.api_limit = 500
@@ -152,10 +159,30 @@ class SmartCoursesSpider(CoursesLegacySpider):
         self.successful_detail_requests = 0
 
         self.hierarchical_stats = {
-            "three_level": {"categories": 0, "courses": 0, "new_courses": 0, "missing_found": 0},
-            "two_level": {"categories": 0, "courses": 0, "new_courses": 0, "missing_found": 0},
-            "one_level": {"categories": 0, "courses": 0, "new_courses": 0, "missing_found": 0},
-            "zero_level": {"categories": 0, "courses": 0, "new_courses": 0, "missing_found": 0},
+            "three_level": {
+                "categories": 0,
+                "courses": 0,
+                "new_courses": 0,
+                "missing_found": 0,
+            },
+            "two_level": {
+                "categories": 0,
+                "courses": 0,
+                "new_courses": 0,
+                "missing_found": 0,
+            },
+            "one_level": {
+                "categories": 0,
+                "courses": 0,
+                "new_courses": 0,
+                "missing_found": 0,
+            },
+            "zero_level": {
+                "categories": 0,
+                "courses": 0,
+                "new_courses": 0,
+                "missing_found": 0,
+            },
         }
 
     def parse_units(self, response):
@@ -196,64 +223,70 @@ class SmartCoursesSpider(CoursesLegacySpider):
 
     def generate_smart_hierarchical_requests(self, units, semester):
         """生成智能階層式搜尋請求，只針對可能包含缺失課程的分類"""
-        
+
         self.logger.info("Starting smart hierarchical search...")
         self.logger.info(f"Looking for {len(self.remaining_missing)} missing courses")
-        
+
         # 1. 三階層搜尋 (最精確)
         three_level_categories = self.get_three_level_categories(units)
-        self.logger.info(f"Scheduling {len(three_level_categories)} three-level category searches")
-        
+        self.logger.info(
+            f"Scheduling {len(three_level_categories)} three-level category searches"
+        )
+
         for dp1, dp2, dp3 in three_level_categories:
             url = self.build_course_list(semester, dp1, dp2, dp3)
             yield scrapy.Request(
                 url=url,
                 callback=self.parse_smart_course_list,
                 cb_kwargs={
-                    "semester": semester, 
-                    "dp1": dp1, 
-                    "dp2": dp2, 
+                    "semester": semester,
+                    "dp1": dp1,
+                    "dp2": dp2,
                     "dp3": dp3,
-                    "search_level": "three_level"
+                    "search_level": "three_level",
                 },
                 meta={"search_level": "three_level"},
                 priority=100,
             )
-        
+
         # 2. 二階層搜尋 (中等精確)
         two_level_categories = self.get_two_level_categories(units)
-        self.logger.info(f"Scheduling {len(two_level_categories)} two-level category searches")
-        
+        self.logger.info(
+            f"Scheduling {len(two_level_categories)} two-level category searches"
+        )
+
         for dp1, dp2 in two_level_categories:
             url = self.build_course_list(semester, dp1, dp2, "")
             yield scrapy.Request(
                 url=url,
                 callback=self.parse_smart_course_list,
                 cb_kwargs={
-                    "semester": semester, 
-                    "dp1": dp1, 
-                    "dp2": dp2, 
+                    "semester": semester,
+                    "dp1": dp1,
+                    "dp2": dp2,
                     "dp3": "",
-                    "search_level": "two_level"
+                    "search_level": "two_level",
                 },
                 meta={"search_level": "two_level"},
                 priority=90,
             )
         # 3. 一階層搜尋 (粗略)
         one_level_categories = self.get_one_level_categories(units)
-        self.logger.info(f"Scheduling {len(one_level_categories)} one-level category searches")
-        
+        self.logger.info(
+            f"Scheduling {len(one_level_categories)} one-level category searches"
+        )
+
         for dp1 in one_level_categories:
             url = self.build_course_list(semester, dp1, "", "")
             yield scrapy.Request(
                 url=url,
                 callback=self.parse_smart_course_list,
                 cb_kwargs={
-                    "semester": semester, 
-                    "dp1": dp1, 
-                    "dp2": "", 
+                    "semester": semester,
+                    "dp1": dp1,
+                    "dp2": "",
                     "dp3": "",
-                    "search_level": "one_level"
+                    "search_level": "one_level",
                 },
                 meta={"search_level": "one_level"},
                 priority=80,
@@ -265,11 +298,11 @@ class SmartCoursesSpider(CoursesLegacySpider):
             url=url,
             callback=self.parse_smart_course_list,
             cb_kwargs={
-                "semester": semester, 
-                "dp1": "", 
-                "dp2": "", 
+                "semester": semester,
+                "dp1": "",
+                "dp2": "",
                 "dp3": "",
-                "search_level": "zero_level"
+                "search_level": "zero_level",
             },
             meta={"search_level": "zero_level"},
             priority=70,
@@ -285,7 +318,7 @@ class SmartCoursesSpider(CoursesLegacySpider):
             self.successfully_processed.add(sub_num)
             # 從剩餘列表中移除
             self.remaining_missing.discard(sub_num)
-            
+
             self.logger.debug(f"✓ Successfully processed course: {sub_num}")
 
         self.total_saved_courses += 1
@@ -294,17 +327,19 @@ class SmartCoursesSpider(CoursesLegacySpider):
             yield CourseLegacyItem(**item)
         else:
             yield item
-    
-    def parse_smart_course_list(self, response, semester, dp1, dp2, dp3, search_level="unknown"):
+
+    def parse_smart_course_list(
+        self, response, semester, dp1, dp2, dp3, search_level="unknown"
+    ):
         """智能解析課程列表，結合去重邏輯和缺失課程檢查"""
         try:
             courses = json.loads(response.text)
             self.api_request_count += 1
-            
+
             # 統計更新
             self.hierarchical_stats[search_level]["categories"] += 1
             self.hierarchical_stats[search_level]["courses"] += len(courses)
-            
+
             # 建立分類鍵值
             if dp1 and dp2 and dp3:
                 category_key = f"{dp1}-{dp2}-{dp3}"
@@ -318,7 +353,7 @@ class SmartCoursesSpider(CoursesLegacySpider):
             else:
                 category_key = "∅-∅-∅"
                 unit_info = {}
-            
+
             if not self.comparator:
                 self.logger.warning("No database comparator available")
                 return
@@ -331,13 +366,13 @@ class SmartCoursesSpider(CoursesLegacySpider):
             # 過濾掉已經排程的課程
             truly_missing = []
             already_scheduled = 0
-            
+
             for course in missing_courses:
                 sub_num = course["subNum"]
                 if sub_num in self.scheduled_courses:
                     already_scheduled += 1
                     continue
-                    
+
                 if sub_num in self.remaining_missing:
                     truly_missing.append(course)
                     self.scheduled_courses.add(sub_num)
@@ -356,14 +391,20 @@ class SmartCoursesSpider(CoursesLegacySpider):
             # 處理真正需要的新課程
             for course in truly_missing:
                 if self.detail_request_count >= self.api_limit:
-                    self.logger.warning(f"Detail request limit reached at {self.api_limit}")
+                    self.logger.warning(
+                        f"Detail request limit reached at {self.api_limit}"
+                    )
                     break
 
-                item = self.create_course_item(course, semester, unit_info, dp1, dp2, dp3)
+                item = self.create_course_item(
+                    course, semester, unit_info, dp1, dp2, dp3
+                )
                 course_id = f"{semester}{course['subNum']}"
 
                 zh_url = self.build_course_detail_url_zh(course_id)
-                unique_url = f"{zh_url}?_smart_req={self.detail_request_count}_{search_level}"
+                unique_url = (
+                    f"{zh_url}?_smart_req={self.detail_request_count}_{search_level}"
+                )
 
                 yield scrapy.Request(
                     url=unique_url,
@@ -386,37 +427,37 @@ class SmartCoursesSpider(CoursesLegacySpider):
                 )
 
                 self.detail_request_count += 1
-        
+
         except json.JSONDecodeError as e:
-            self.logger.error(f"[{search_level}] JSON parse error for {category_key}: {e}")
+            self.logger.error(
+                f"[{search_level}] JSON parse error for {category_key}: {e}"
+            )
         except Exception as e:
             self.logger.error(f"[{search_level}] Error processing {category_key}: {e}")
-
 
     def handle_request_error(self, failure):
         """Handle request failures"""
         self.failed_requests += 1
         course_id = failure.request.meta.get("course_id", "unknown")
         sub_num = failure.request.meta.get("sub_num", "unknown")
-        
+
         # 如果請求失敗，將課程放回待處理列表
         if sub_num != "unknown":
             self.scheduled_courses.discard(sub_num)
             self.remaining_missing.add(sub_num)
-        
-        self.logger.error(f"✗ Request failed for course {course_id}: {failure}")
 
+        self.logger.error(f"✗ Request failed for course {course_id}: {failure}")
 
     def spider_idle(self):
         """當階層式搜尋完成後，直接爬取真正剩餘的課程"""
-        
+
         # 計算真正剩餘的課程
         truly_remaining = (
-            self.remaining_missing 
-            - self.scheduled_courses 
+            self.remaining_missing
+            - self.scheduled_courses
             - self.successfully_processed
         )
-        
+
         self.logger.info("=== Spider Idle Check ===")
         self.logger.info(f"Original missing: {len(self.missing_courses)}")
         self.logger.info(f"Scheduled: {len(self.scheduled_courses)}")
@@ -427,14 +468,14 @@ class SmartCoursesSpider(CoursesLegacySpider):
             self.logger.info(
                 f"Starting direct crawl for {len(truly_remaining)} truly remaining courses"
             )
-            
+
             requests_made = 0
             available_quota = self.api_limit - self.detail_request_count
-            
+
             for sub_num in list(truly_remaining)[:available_quota]:
                 semester = "1141"
                 course_id = f"{semester}{sub_num}"
-                
+
                 # 標記為已排程
                 self.scheduled_courses.add(sub_num)
 
@@ -478,10 +519,10 @@ class SmartCoursesSpider(CoursesLegacySpider):
                     syllabus="",
                     objective="",
                 )
-                
+
                 zh_url = self.build_course_detail_url_zh(course_id)
                 unique_url = f"{zh_url}?_direct_{requests_made}"
-                
+
                 course_data = {
                     "subNum": sub_num,
                     "is_direct_crawl": True,
@@ -509,15 +550,18 @@ class SmartCoursesSpider(CoursesLegacySpider):
 
             if requests_made > 0:
                 self.logger.info(f"Scheduled {requests_made} direct crawl requests")
-                raise scrapy.exceptions.DontCloseSpider("Direct crawl requests scheduled")
+                raise scrapy.exceptions.DontCloseSpider(
+                    "Direct crawl requests scheduled"
+                )
             else:
                 self.logger.info("No additional direct crawl requests needed")
         else:
             if not truly_remaining:
                 self.logger.info("All missing courses have been processed")
             else:
-                self.logger.info(f"API limit reached, {len(truly_remaining)} courses remain")
-
+                self.logger.info(
+                    f"API limit reached, {len(truly_remaining)} courses remain"
+                )
 
     @classmethod
     def from_crawler(cls, crawler, *args, **kwargs):
