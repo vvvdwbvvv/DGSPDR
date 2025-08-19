@@ -1,5 +1,6 @@
 import os
 import sys
+import ssl
 from typing import Optional
 
 import requests
@@ -7,7 +8,9 @@ import urllib3
 from requests import ssl
 from requests.adapters import HTTPAdapter
 
-project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+project_root = os.path.dirname(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+)
 sys.path.insert(0, project_root)
 
 from NCCUCrawl.NCCUCrawl.config import Config
@@ -45,7 +48,9 @@ class AuthClient:
             def init_poolmanager(self, connections, maxsize, block=False, **kwargs):
                 ctx = self._create_legacy_ssl_context()
                 kwargs["ssl_context"] = ctx
-                return super().init_poolmanager(connections, maxsize, block=block, **kwargs)
+                return super().init_poolmanager(
+                    connections, maxsize, block=block, **kwargs
+                )
 
             def _create_legacy_ssl_context(self):
                 """Create SSL context that allows legacy renegotiation."""
@@ -69,7 +74,9 @@ class AuthClient:
                     ctx.set_ciphers("DEFAULT:@SECLEVEL=1")
                 except ssl.SSLError:
                     # Fallback if SECLEVEL is not supported
-                    ctx.set_ciphers("ALL:!aNULL:!eNULL:!EXPORT:!DES:!RC4:!MD5:!PSK:!SRP:!CAMELLIA")
+                    ctx.set_ciphers(
+                        "ALL:!aNULL:!eNULL:!EXPORT:!DES:!RC4:!MD5:!PSK:!SRP:!CAMELLIA"
+                    )
 
                 # Additional options for legacy compatibility
                 ctx.options |= ssl.OP_NO_SSLv2

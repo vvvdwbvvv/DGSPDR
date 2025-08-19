@@ -14,7 +14,7 @@ class Config:
         self.PASSWORD = os.getenv("PASSWORD", "")
 
         # Server configuration
-        self.SERVER_URL = "http://es.nccu.edu.tw/"
+        self.SERVER_URL = "https://es.nccu.edu.tw/"
         self.KEY = "vvvdwbvv"
 
         # API endpoints
