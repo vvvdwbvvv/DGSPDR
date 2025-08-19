@@ -9,6 +9,33 @@ class CoursesLegacySpider(scrapy.Spider):
         "DOWNLOAD_DELAY": 0.1,
     }
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # 追蹤已處理的課程，避免重複
+        self.processed_courses = set()
+        self.search_stats = {
+            "three_level": {"categories": 0, "courses": 0, "new_courses": 0},
+            "two_level": {"categories": 0, "courses": 0, "new_courses": 0},
+            "one_level": {"categories": 0, "courses": 0, "new_courses": 0},
+            "zero_level": {"categories": 0, "courses": 0, "new_courses": 0},
+        }
+
+    def _find_unit_info_for_two_level(self, dp1, dp2):
+        """為二階層搜尋尋找對應的 unit_info"""
+        for key, info in self.unit_mapping.items():
+            key_parts = key.split("-")
+            if len(key_parts) == 3 and key_parts[0] == dp1 and key_parts[1] == dp2:
+                return info
+        return {}
+
+    def _find_unit_info_for_one_level(self, dp1):
+        """為一階層搜尋尋找對應的 unit_info"""
+        for key, info in self.unit_mapping.items():
+            key_parts = key.split("-")
+            if len(key_parts) == 3 and key_parts[0] == dp1:
+                return info
+        return {}
+
     def start_requests(self):
         # 先抓 unit.json
         yield scrapy.Request(
@@ -48,21 +75,113 @@ class CoursesLegacySpider(scrapy.Spider):
                                     if " / " in l3["utL3Text"]
                                     else "",
                                 }
-        categories = self.get_categories(units)
         semesters = self.get_semesters()
-
         for sem in semesters:
-            for dp1, dp2, dp3 in categories:
-                url = self.build_course_list(sem, dp1, dp2, dp3)
-                yield scrapy.Request(
-                    url=url,
-                    callback=self.parse_course_list,
-                    cb_kwargs={"semester": sem, "dp1": dp1, "dp2": dp2, "dp3": dp3},
-                )
+            yield from self.generate_hierarchical_requests(units, sem)
 
+    def generate_hierarchical_requests(self, units, semester):
+        """生成階層式搜尋請求：三階層 → 二階層 → 一階層 → 零階層"""
+        
+        # 1. 三階層搜尋 (dp1-dp2-dp3)
+        three_level_categories = self.get_three_level_categories(units)
+        for dp1, dp2, dp3 in three_level_categories:
+            url = self.build_course_list(semester, dp1, dp2, dp3)
+            yield scrapy.Request(
+                url=url,
+                callback=self.parse_course_list,
+                cb_kwargs={
+                    "semester": semester, 
+                    "dp1": dp1, 
+                    "dp2": dp2, 
+                    "dp3": dp3,
+                    "search_level": "three_level"
+                },
+                meta={"search_level": "three_level"},
+                priority=100,  # 最高優先級
+            )
+        # 2. 二階層搜尋 (dp1-dp2-"")
+        two_level_categories = self.get_two_level_categories(units)
+        for dp1, dp2 in two_level_categories:
+            url = self.build_course_list(semester, dp1, dp2, "")
+            yield scrapy.Request(
+                url=url,
+                callback=self.parse_course_list,
+                cb_kwargs={
+                    "semester": semester, 
+                    "dp1": dp1, 
+                    "dp2": dp2, 
+                    "dp3": "",
+                    "search_level": "two_level"
+                },
+                meta={"search_level": "two_level"},
+                priority=90,  # 第二優先級
+            )
+        # 3. 一階層搜尋 (dp1-""-"")
+        one_level_categories = self.get_one_level_categories(units)
+        for dp1 in one_level_categories:
+            url = self.build_course_list(semester, dp1, "", "")
+            yield scrapy.Request(
+                url=url,
+                callback=self.parse_course_list,
+                cb_kwargs={
+                    "semester": semester, 
+                    "dp1": dp1, 
+                    "dp2": "", 
+                    "dp3": "",
+                    "search_level": "one_level"
+                },
+                meta={"search_level": "one_level"},
+                priority=80,  # 第三優先級
+            )
+
+        # 4. 零階層搜尋 (""-""-"") - 全部課程
+        url = self.build_course_list(semester, "", "", "")
+        yield scrapy.Request(
+            url=url,
+            callback=self.parse_course_list,
+            cb_kwargs={
+                "semester": semester, 
+                "dp1": "", 
+                "dp2": "", 
+                "dp3": "",
+                "search_level": "zero_level"
+            },
+            meta={"search_level": "zero_level"},
+            priority=70,  # 最低優先級
+        )
+
+    def get_three_level_categories(self, units):
+        """取得所有三階層分類 (dp1-dp2-dp3)"""
+        categories = []
+        for l1 in units:
+            if l1["utCodL1"] != "0":
+                for l2 in l1["utL2"]:
+                    if l2["utCodL2"] != "0":
+                        for l3 in l2["utL3"]:
+                            if l3["utCodL3"] != "0":
+                                categories.append((l1["utCodL1"], l2["utCodL2"], l3["utCodL3"]))
+        return categories
+    
+    def get_two_level_categories(self, units):
+        """取得所有二階層分類 (dp1-dp2)，去重複"""
+        categories = set()
+        for l1 in units:
+            if l1["utCodL1"] != "0":
+                for l2 in l1["utL2"]:
+                    if l2["utCodL2"] != "0":
+                        categories.add((l1["utCodL1"], l2["utCodL2"]))
+        return list(categories)
+    
+    def get_one_level_categories(self, units):
+        """取得所有一階層分類 (dp1)，去重複"""
+        categories = set()
+        for l1 in units:
+            if l1["utCodL1"] != "0":
+                categories.add(l1["utCodL1"])
+        return list(categories)
+    
     def get_categories(self, units):
         categories = []
-
         for l1 in units:
             if l1["utCodL1"] != "0":
                 # 添加只有 dp1 的情況 (dp2="", dp3="")
@@ -146,12 +265,48 @@ class CoursesLegacySpider(scrapy.Spider):
             objective="",  # In parse_syllabus
         )
 
-    def parse_course_list(self, response, semester, dp1, dp2, dp3):
+    def parse_course_list(self, response, semester, dp1, dp2, dp3, search_level="unknown"):
         courses = json.loads(response.text)
-        unit_key = f"{dp1}-{dp2}-{dp3}"
-        unit_info = self.unit_mapping.get(unit_key, {})
+        self.search_stats[search_level]["categories"] += 1
+        self.search_stats[search_level]["courses"] += len(courses)
+        
+        if dp1 and dp2 and dp3:
+            category_key = f"{dp1}-{dp2}-{dp3}"
+            unit_info = self.unit_mapping.get(category_key, {})
+        elif dp1 and dp2:
+            category_key = f"{dp1}-{dp2}-∅"
+            # 尋找對應的 unit_info (可能需要從三階層對應找)
+            unit_info = self._find_unit_info_for_two_level(dp1, dp2)
+        elif dp1:
+            category_key = f"{dp1}-∅-∅"
+            unit_info = self._find_unit_info_for_one_level(dp1)
+        else:
+            category_key = "∅-∅-∅"
+            unit_info = {}
 
+        new_courses = []
+        duplicate_count = 0
+        
         for c in courses:
+                course_id = f"{semester}{c['subNum']}"
+                if course_id not in self.processed_courses:
+                    new_courses.append(c)
+                    self.processed_courses.add(course_id)
+                else:
+                    duplicate_count += 1
+
+        # 更新統計
+        self.search_stats[search_level]["new_courses"] += len(new_courses)
+
+        # 日誌輸出
+        if new_courses or duplicate_count > 0:
+            self.logger.info(
+                f"[{search_level}] {category_key}: "
+                f"Total={len(courses)}, New={len(new_courses)}, "
+                f"Duplicates={duplicate_count}"
+            )
+
+        for c in new_courses:
             item = self.create_course_item(c, semester, unit_info, dp1, dp2, dp3)
             course_id = f"{semester}{c['subNum']}"
 
@@ -167,10 +322,28 @@ class CoursesLegacySpider(scrapy.Spider):
                     "dp1": dp1,
                     "dp2": dp2,
                     "dp3": dp3,
+                    "search_level": search_level,
+                    "category_key": category_key,
                 },
                 dont_filter=True,
             )
 
+    def _find_unit_info_for_two_level(self, dp1, dp2):
+        """為二階層搜尋尋找對應的 unit_info"""
+        for key, info in self.unit_mapping.items():
+            key_parts = key.split("-")
+            if len(key_parts) == 3 and key_parts[0] == dp1 and key_parts[1] == dp2:
+                return info
+        return {}
+
+    def _find_unit_info_for_one_level(self, dp1):
+        """為一階層搜尋尋找對應的 unit_info"""
+        for key, info in self.unit_mapping.items():
+            key_parts = key.split("-")
+            if len(key_parts) == 3 and key_parts[0] == dp1:
+                return info
+        return {}
+    
     def convert_kind_to_int(self, kind_str, lmt_kind_str=""):
         """Convert kind string to integer, considering lmtKind for special cases"""
         if lmt_kind_str:
