@@ -5,15 +5,13 @@ from typing import Optional
 
 import requests
 import urllib3
-from requests import ssl
 from requests.adapters import HTTPAdapter
+from NCCUCrawl.NCCUCrawl.config import Config
 
 project_root = os.path.dirname(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 )
 sys.path.insert(0, project_root)
-
-from NCCUCrawl.NCCUCrawl.config import Config
 
 
 class Auth:

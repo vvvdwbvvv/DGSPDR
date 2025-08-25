@@ -44,5 +44,20 @@ class Config:
     def courseresult_csv(self, sem: str) -> str:
         return f"{sem}CourseResult.csv"
 
+    def get_login_url(self, username, password):
+        return f"{self.PERSON_API}{username}!!){password}/"
+
+    def get_addtrack_url(self, encstu, courseid):
+        return f"{self.TRACE_API}C/zh-TW/3{courseid}-{encstu}/"
+
+    def get_deltrack_url(self, encstu, courseid):
+        return f"{self.TRACE_API}D/zh-TW/{courseid}-{encstu}/"
+
+    def get_track_url(self, encstu):
+        return f"{self.TRACE_API}zh-TW/{encstu}/"
+
+    def get_updatetrack_url(self, encstu, courseid):
+        return f"{self.TRACE_API}U/zh-TW/1{courseid}-{encstu}/"
+
 
 config = Config()

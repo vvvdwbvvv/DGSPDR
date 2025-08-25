@@ -1,79 +1,85 @@
-from typing import Optional, Dict, Any, List
+from typing import List, Dict, Any, Optional
 import requests
 from .auth import Authenticate
 from .config import Config
 
 
-class NCCUAPIClient:
-    def __init__(self, username: Optional[str] = None, password: Optional[str] = None):
+class CourseTracker:
+    def __init__(self,
+                 username: Optional[str] = None,
+                 password: Optional[str] = None,
+                 auto_login: bool = True):
         self.config = Config()
+        self._session = requests.Session()
+        self._session.headers.update({
+            "User-Agent": "NCCUCrawl/1.0",
+            "Accept": "application/json",
+        })
         self.auth = Authenticate(username, password)
-        self.session = requests.Session()
+        self._token: Optional[str] = None
 
-        self.session.headers.update(
-            {
-                "User-Agent": "NCCUCrawl/1.0",
-                "Accept": "application/json",
-            }
-        )
-
-    def _make_request(self, method: str, url: str, **kwargs) -> requests.Response:
-        try:
-            response = self.session.request(method, url, **kwargs)
-            response.raise_for_status()
-            return response
-        except requests.RequestException as e:
-            raise Exception(f"Request failed: {str(e)}")
-
-    def get_json(self, url: str, **kwargs) -> List[Dict[str, Any]]:
-        response = self._make_request("GET", url, **kwargs)
-        return response.json()
-
-    def post_json(self, url: str, **kwargs) -> List[Dict[str, Any]]:
-        response = self._make_request("POST", url, **kwargs)
-        return response.json()
-
-    def delete_json(self, url: str, **kwargs) -> List[Dict[str, Any]]:
-        response = self._make_request("DELETE", url, **kwargs)
-        return response.json()
+        if auto_login:
+            token = self.auth.login()  # 建議你的 Authenticate.login() 直接回傳 token
+            if not token or str(token).upper() == "ERROR":
+                raise RuntimeError("Login failed: encstu token missing or ERROR")
+            self._token = token
 
 
-class CourseTracker(NCCUAPIClient):
+    def set_token(self, token: str) -> None:
+        if not token or str(token).upper() == "ERROR":
+            raise ValueError("Invalid token")
+        self._token = token
+
+    def get_token(self) -> str:
+        if not self._token:
+            raise RuntimeError("Token not set. Call login() or set_token() first.")
+        return self._token
+
+
+    def _request_json(self, method: str, url: str) -> List[Dict[str, Any]]:
+        r = self._session.request(method, url, timeout=15)
+        r.raise_for_status()
+        return r.json()
+
+
     def add_track(self, course_id: str) -> None:
         if not course_id:
-            raise ValueError("Course ID cannot be empty")
-
-        url = self.auth.get_addtrack_url(course_id)
-        data = self.post_json(url)
-
+            raise ValueError("course_id cannot be empty")
+        token = self.get_token()
+        url = self.config.get_addtrack_url(token, course_id)
+        data = self._request_json("POST", url)
         if not data or data[0].get("procid") != "1":
-            raise Exception(f"Add track failed: {course_id}")
+            raise RuntimeError(f"Add track failed: {course_id}")
 
     def delete_track(self, course_id: str) -> None:
         if not course_id:
-            raise ValueError("Course ID cannot be empty")
-
-        url = self.auth.get_deltrack_url(course_id)
-        data = self.delete_json(url)
-
+            raise ValueError("course_id cannot be empty")
+        token = self.get_token()
+        url = self.config.get_deltrack_url(token, course_id)
+        data = self._request_json("DELETE", url)
         if not data or data[0].get("procid") != "9":
-            raise Exception(f"Delete track failed: {course_id}")
+            raise RuntimeError(f"Delete track failed: {course_id}")
 
     def get_tracks(self) -> List[Dict[str, Any]]:
-        url = self.auth.get_track_url()
-        return self.get_json(url)
-
+        token = self.get_token()
+        url = self.config.get_track_url(token)
+        return self._request_json("GET", url)
+    
     def clear_all_tracks(self) -> None:
-        tracks = self.get_tracks()
-        for course in tracks:
+        for c in self.get_tracks() or []:
+            cid = str(c.get("subNum") or "").strip()
+            if not cid:
+                continue
             try:
-                self.delete_track(str(course["subNum"]))
+                self.delete_track(cid)
             except Exception:
                 continue
 
     def batch_add_tracks(self, course_ids: List[str]) -> None:
-        for course_id in course_ids:
+        for cid in course_ids:
+            if not cid:
+                continue
             try:
-                self.add_track(course_id)
+                self.add_track(cid)
             except Exception:
                 continue
