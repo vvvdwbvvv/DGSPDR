@@ -31,3 +31,7 @@ courses_export_upsert:
 teacher:
 	cd NCCUCrawl && \
 	python3 -m scrapy crawl teacher_deprecated -L INFO
+
+test_login:
+	cd NCCUCrawl && \
+	python3 -c "from NCCUCrawl.auth_curl import Authenticate; auth = Authenticate(); print(auth.login())"
