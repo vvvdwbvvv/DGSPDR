@@ -1,11 +1,12 @@
-.PHONY: checkstyle course
+.PHONY: checkstyle course courses_legacy courses_complete_it courses_export_upsert teacher test_all 
 # run the below script to format
 # sed -i '' 's/^    /\t/g' makefile
+
 checkstyle:
-	python3 -m ruff check . --exclude deprecated_crawl; ruff_check_status=$$?; \
-	python3 -m ruff format --check . --exclude deprecated_crawl; ruff_format_status=$$?; \
-	python3 -m ruff check . --fix --exclude deprecated_crawl; \
-	python3 -m ruff format . --exclude deprecated_crawl; \
+	python3 -m ruff check . --exclude test; ruff_check_status=$$?; \
+	python3 -m ruff format --check . --exclude test; ruff_format_status=$$?; \
+	python3 -m ruff check . --fix --exclude test; \
+	python3 -m ruff format . --exclude test; \
 	if [ $$ruff_check_status -ne 0 ] || [ $$ruff_format_status -ne 0 ]; then \
 	    exit 1; \
 	fi
@@ -30,8 +31,18 @@ courses_export_upsert:
 
 teacher:
 	cd NCCUCrawl && \
-	python3 -m scrapy crawl teacher_deprecated -L INFO
+	python3 -m scrapy crawl teacher_legacy -L INFO
+
+test_all:
+	cd NCCUCrawl && \
+	python3 -m pytest -v -rP
 
 test_login:
 	cd NCCUCrawl && \
 	python3 -c "from NCCUCrawl.auth_curl import Authenticate; auth = Authenticate(); print(auth.login())"
+
+test_token:
+	cd NCCUCrawl && \
+	ENCSTU="your token, which can obtain after `test_login`"
+	ENC=$(python3 -c "import urllib.parse,sys;print(urllib.parse.quote(sys.argv[1],safe=''))" "$ENCSTU")
+	curl -X POST "https://es.nccu.edu.tw/tracing/zh-TW/$ENC/"
