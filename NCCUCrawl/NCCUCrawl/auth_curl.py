@@ -9,6 +9,8 @@ class Authenticate:
         self.config = Config()
         self.username = username or self.config.USERNAME
         self.password = password or self.config.PASSWORD
+        if not self.username or not self.password:
+            raise ValueError("USERNAME or PASSWORD not set. Check NCCUCrawl/.env")
         self.client = AuthClient()
 
     def login(self):
