@@ -20,6 +20,8 @@ class CoursesLegacySpider(scrapy.Spider):
             "zero_level": {"categories": 0, "courses": 0, "new_courses": 0},
         }
 
+        self.course_stats = {"course_ids": set(), "course_names": set()}
+
     def _find_unit_info_for_two_level(self, dp1, dp2):
         """為二階層搜尋尋找對應的 unit_info"""
         for key, info in self.unit_mapping.items():
@@ -271,6 +273,12 @@ class CoursesLegacySpider(scrapy.Spider):
         self, response, semester, dp1, dp2, dp3, search_level="unknown"
     ):
         courses = json.loads(response.text)
+        for course in courses:
+            if "subNum" in course:
+                self.course_stats["course_ids"].add(course["subNum"])
+            if "subNam" in course:
+                self.course_stats["course_names"].add(course["subNam"])
+
         self.search_stats[search_level]["categories"] += 1
         self.search_stats[search_level]["courses"] += len(courses)
 
@@ -472,3 +480,33 @@ class CoursesLegacySpider(scrapy.Spider):
                 item["syllabus"] = response.url
 
         yield from self.process_course_item(item, course_data)
+
+
+@classmethod
+def from_crawler(cls, crawler, *args, **kwargs):
+    spider = super(CoursesLegacySpider, cls).from_crawler(crawler, *args, **kwargs)
+    crawler.signals.connect(spider.spider_closed, signal=scrapy.signals.spider_closed)
+    return spider
+
+
+def spider_closed(self, reason):
+    """Report course stats when spider closes"""
+    # Log the stats
+    self.logger.info("=== Course Statistics ===")
+    self.logger.info(f"Unique course IDs: {len(self.course_stats['course_ids'])}")
+    self.logger.info(f"Unique course names: {len(self.course_stats['course_names'])}")
+
+    # Sample of collected data (optional)
+    if self.course_stats["course_ids"]:
+        sample_ids = list(self.course_stats["course_ids"])[:5]
+        self.logger.info(f"Course ID samples: {', '.join(sample_ids)}")
+
+    # Export metrics to your OpenTelemetry system if available
+    if hasattr(self, "crawler") and hasattr(self.crawler, "stats"):
+        # Add to Scrapy stats
+        self.crawler.stats.set_value(
+            "course_count/ids", len(self.course_stats["course_ids"])
+        )
+        self.crawler.stats.set_value(
+            "course_count/names", len(self.course_stats["course_names"])
+        )
