@@ -58,6 +58,7 @@ class TeacherSpider(scrapy.Spider):
         self.tracker: CourseTracker | None = None
         self.teacher_id_dict: dict[str, str] = {}
         self._shutdown = False
+        self.teacher_stats = {"course_id": set(), "teacher_name": set()}
 
     def _load_course_ids_from_db(self, db_path: str, year_sem: str) -> List[str]:
         """
@@ -165,6 +166,8 @@ class TeacherSpider(scrapy.Spider):
                 want = {c.strip() for c in chunk}
                 for course in tracked:
                     cid = str(course.get("subNum") or "").strip()
+                    if cid:
+                        self.teacher_stats["course_id"].add(cid)
                     if cid and cid in want:
                         # 只處理本批
                         yield from self._process_course(course)
@@ -203,6 +206,8 @@ class TeacherSpider(scrapy.Spider):
         try:
             teacher_stat_url = str(course.get("teaStatUrl") or "")
             teacher_name = (course.get("teaNam") or "").strip()
+            if teacher_name:
+                self.teacher_stats["teacher_name"].add(teacher_name)
             if not teacher_stat_url:
                 self.logger.debug("No teacher_stat_url in course: %r", course)
                 return
@@ -276,9 +281,20 @@ class TeacherSpider(scrapy.Spider):
         rs = (str(reason) or "").lower()
         if rs in {"shutdown", "cancelled", "keyboard interrupt"}:
             self._shutdown = True
+        course_ids_count = len(self.teacher_stats["course_id"])
+        teacher_names_count = len(self.teacher_stats["teacher_name"])
         self.logger.info(
             "Spider closed via signal: %s (shutdown=%s)", reason, self._shutdown
         )
+
+        self.logger.info(
+            "教師統計 - 課程IDs: %d, 教師名稱: %d",
+            course_ids_count,
+            teacher_names_count,
+        )
+        if hasattr(self, "crawler") and hasattr(self.crawler, "stats"):
+            self.crawler.stats.set_value("teacher_count/ids", course_ids_count)
+            self.crawler.stats.set_value("teacher_count/names", teacher_names_count)
 
     def closed(self, reason):
         if self._shutdown or not self.tracker:
