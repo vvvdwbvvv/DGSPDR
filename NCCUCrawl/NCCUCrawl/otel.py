@@ -266,7 +266,7 @@ class ObservabilityExtension:
             extra_fields.append(
                 {
                     "name": "Teacher Statistics",
-                    "value": f"Teacher IDs: {teacher_id_count}\nTeacher Names: {teacher_name_count}",
+                    "value": f"Course IDs: {teacher_id_count}\nTeacher Names: {teacher_name_count}",
                     "inline": True,
                 }
             )
