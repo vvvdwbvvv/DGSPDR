@@ -116,9 +116,28 @@ class CourseTracker:
             raise ValueError("course_id cannot be empty")
         token = self.get_token()
         url = self.config.get_addtrack_url(token, course_id)
-        data = self._request_json("POST", url)
-        if not data or data[0].get("procid") != "1":
-            raise RuntimeError(f"Add track failed: {course_id}")
+        try:
+            data = self._request_json("POST", url)
+            if not data:
+                raise RuntimeError("Empty response")
+
+            proc_id = data[0].get("procid")
+            error_msg = data[0].get("msg", "Unknown error")
+
+            if proc_id == "1":
+                return  # Success
+            elif proc_id in {"2", "3", "4"}:  # Known error codes
+                raise RuntimeError(f"{error_msg}")
+            else:
+                raise RuntimeError(f"Invalid procid '{proc_id}': {error_msg}")
+
+        except ValueError as ve:
+            logging.warning(
+                f"add skip {track_id}: Add track failed: {track_id} - Invalid procid '{proc_id}': {str(ve)}")
+            return False
+        except Exception as e:
+            logging.error(f"add skip {track_id}: Unexpected error: {str(e)}")
+            return False
 
     def delete_track(self, course_id: str) -> None:
         if not course_id:
