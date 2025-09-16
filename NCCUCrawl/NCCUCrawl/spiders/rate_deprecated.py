@@ -1,33 +1,46 @@
+import os
 import scrapy
+import sqlite3
 from NCCUCrawl.items import RateLegacyItem
 
 
 class RateDeprecatedSpider(scrapy.Spider):
-    name = "rate_deprecated"
+    name = "rate_legacy"
     custom_settings = {
         "DOWNLOAD_DELAY": 0.2,
     }
 
-    def start_requests(self):
-        """Load teacher data and start crawling"""
-
+    async def start(self):
+        """Load teacher data from data.db and start crawling"""
         teacher_list = {}
+        # Load teacher lists from COURSE table in data.db
+        base_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+        db_path = os.path.join(base_dir, "data.db")
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT DISTINCT name, id FROM teacher_legacy WHERE name IS NOT NULL AND id IS NOT NULL"
+        )
+        for teacher_name, teacher_id in cursor.fetchall():
+            if teacher_name and teacher_id:
+                teacher_list[teacher_name] = teacher_id
+        conn.close()
 
-        all_semesters = ["1111", "1112"]
+        # Read semesters from environment variable
+        semester = os.getenv("YEAR") + os.getenv("SEM")
 
         for teacher_name, teacher_id in teacher_list.items():
-            for semester in all_semesters:
-                statistic_url = f"http://newdoc.nccu.edu.tw/teaschm/{semester}/statistic.jsp-tnum={teacher_id}.htm"
-                yield scrapy.Request(
-                    url=statistic_url,
-                    callback=self.parse_teacher_courses,
-                    meta={
-                        "teacher_id": teacher_id,
-                        "teacher_name": teacher_name,
-                        "semester": semester,
-                    },
-                    encoding="big5",
-                )
+            statistic_url = f"http://newdoc.nccu.edu.tw/teaschm/{semester}/statistic.jsp-tnum={teacher_id}.htm"
+            yield scrapy.Request(
+                url=statistic_url,
+                callback=self.parse_teacher_courses,
+                meta={
+                    "teacher_id": teacher_id,
+                    "teacher_name": teacher_name,
+                    "semester": semester,
+                },
+                encoding="big5",
+            )
 
     def parse_teacher_courses(self, response):
         """Parse teacher's courses page to find available courses"""

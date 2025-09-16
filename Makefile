@@ -33,6 +33,10 @@ teacher:
 	cd NCCUCrawl && \
 	python3 -m scrapy crawl teacher_legacy -L INFO
 
+rate_lagacy:
+	cd NCCUCrawl && \
+	python3 -m scrapy crawl rate_legacy -L INFO
+
 test_all:
 	cd NCCUCrawl && \
 	python3 -m pytest -v -rP

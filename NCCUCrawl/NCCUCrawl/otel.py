@@ -198,6 +198,10 @@ class ObservabilityExtension:
             logger=logging.getLogger(__name__),
         )
 
+        ext._active_spiders = set()
+        ext._is_last_spider = False
+        ext._rate_payload = None
+
         crawler.signals.connect(ext.spider_opened, signal=signals.spider_opened)
         crawler.signals.connect(ext.spider_error, signal=signals.spider_error)
         crawler.signals.connect(ext.spider_closed, signal=signals.spider_closed)
@@ -223,6 +227,20 @@ class ObservabilityExtension:
             pass
 
     def spider_closed(self, spider, reason):
+        if spider.name in self._active_spiders:
+            self._active_spiders.remove(spider.name)
+        self._is_last_spider = len(self._active_spiders) == 0
+
+        if self._is_last_spider and hasattr(self, '_rate_payload') and self._rate_payload:
+            def _post_rate():
+                self.logger.info("Sending delayed webhook for rate spider")
+                return send_discord_webhook(self.webhook_url, self._rate_payload)
+
+            deferToThread(_post_rate).addCallbacks(
+                lambda r: self.logger.info("Delayed rate webhook sent"),
+                lambda f: self.logger.error("Delayed rate webhook failed: %s", f.getErrorMessage())
+            )
+
         stats = dict(spider.crawler.stats.get_stats() or {})
 
         # Add elapsed time if missing
@@ -286,6 +304,14 @@ class ObservabilityExtension:
         if not self.webhook_url:
             self.logger.warning("DISCORD_WEBHOOK_URL not set; skipping notification.")
             return
+
+        # Skip webhook for rate/rate_legacy spider unless it's the last one to finish
+        if spider.name in ('rate', 'rate_legacy') and hasattr(self, '_is_last_spider'):
+            if not self._is_last_spider:
+                self.logger.info("Skipping webhook for rate spider until all spiders complete")
+                # Store payload for later
+                self._rate_payload = payload
+                return
 
         def _post():
             return send_discord_webhook(self.webhook_url, payload)
