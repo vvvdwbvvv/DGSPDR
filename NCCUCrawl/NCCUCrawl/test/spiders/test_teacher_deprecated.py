@@ -223,6 +223,18 @@ class TeacherSpiderTest(unittest.TestCase):
         self.assertEqual(tracker_mock.get_tracks.call_count, 3)
         self.assertEqual(mock_sleep.call_count, 2)
 
+    def test_err_parse_set20_logs_warning(self):
+        # Create a fake failure object
+        class FakeFailure:
+            def __init__(self, value, url):
+                self.value = value
+                self.request = type('obj', (object,), {'url': url})()
+        failure = FakeFailure("Ignoring non-200 response", "http://fakeurl")
+        with self.assertLogs(level='WARNING') as log:
+            self.spider._err_parse_set20(failure)
+        found = any("set20 request failed: Ignoring non-200 response" in message for message in log.output)
+        self.assertTrue(found, f"Expected warning log not found in logs: {log.output}")
+
 
 if __name__ == '__main__':
     unittest.main()
