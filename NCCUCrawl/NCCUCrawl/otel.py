@@ -10,7 +10,7 @@ from twisted.internet.threads import deferToThread
 from scrapy import signals
 
 
-# ---------- OpenTelemetry setup ----------
+# ---------- Otel setup ----------
 def setup_otel(service_name: str = "scrapy-service") -> None:
     """
     Initialize OpenTelemetry tracing for Scrapy.
