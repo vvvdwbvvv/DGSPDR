@@ -249,22 +249,24 @@ class ObservabilityExtension:
         # Example: if spider has course_stats attribute
         course_stats = getattr(spider, "course_stats", None)
         if isinstance(course_stats, dict):
-
-            def _len_or_val(v: Any) -> int:
-                try:
-                    return len(v)
-                except Exception:
-                    try:
-                        return int(v)
-                    except Exception:
-                        return 0
-
-            course_id_count = _len_or_val(course_stats.get("course_ids", 0))
-            course_name_count = _len_or_val(course_stats.get("course_names", 0))
+            course_id_count = len(course_stats.get("course_ids", set()))
+            course_name_count = len(course_stats.get("course_names", set()))
             extra_fields.append(
                 {
-                    "name": "Course Metrics",
+                    "name": "Course Statistics",
                     "value": f"Course IDs: {course_id_count}\nCourse Names: {course_name_count}",
+                    "inline": True,
+                }
+            )
+
+        teacher_id_count = stats.get("teacher_count/ids", 0)
+        teacher_name_count = stats.get("teacher_count/names", 0)
+
+        if teacher_id_count or teacher_name_count:
+            extra_fields.append(
+                {
+                    "name": "Teacher Statistics",
+                    "value": f"Teacher IDs: {teacher_id_count}\nTeacher Names: {teacher_name_count}",
                     "inline": True,
                 }
             )
