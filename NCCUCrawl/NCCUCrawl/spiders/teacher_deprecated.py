@@ -250,8 +250,7 @@ class TeacherSpider(scrapy.Spider):
 
     def _parse_set20_big5(self, response: scrapy.http.Response):
         try:
-            html = response.body.decode("big5", errors="ignore")
-            sel = scrapy.Selector(text=html)
+            sel = response
             for row in sel.css("tr"):
                 tds = row.css("td")
                 if len(tds) < 2:
