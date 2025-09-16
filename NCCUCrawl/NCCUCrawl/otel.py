@@ -231,14 +231,21 @@ class ObservabilityExtension:
             self._active_spiders.remove(spider.name)
         self._is_last_spider = len(self._active_spiders) == 0
 
-        if self._is_last_spider and hasattr(self, '_rate_payload') and self._rate_payload:
+        if (
+            self._is_last_spider
+            and hasattr(self, "_rate_payload")
+            and self._rate_payload
+        ):
+
             def _post_rate():
                 self.logger.info("Sending delayed webhook for rate spider")
                 return send_discord_webhook(self.webhook_url, self._rate_payload)
 
             deferToThread(_post_rate).addCallbacks(
                 lambda r: self.logger.info("Delayed rate webhook sent"),
-                lambda f: self.logger.error("Delayed rate webhook failed: %s", f.getErrorMessage())
+                lambda f: self.logger.error(
+                    "Delayed rate webhook failed: %s", f.getErrorMessage()
+                ),
             )
 
         stats = dict(spider.crawler.stats.get_stats() or {})
@@ -306,9 +313,11 @@ class ObservabilityExtension:
             return
 
         # Skip webhook for rate/rate_legacy spider unless it's the last one to finish
-        if spider.name in ('rate', 'rate_legacy') and hasattr(self, '_is_last_spider'):
+        if spider.name in ("rate", "rate_legacy") and hasattr(self, "_is_last_spider"):
             if not self._is_last_spider:
-                self.logger.info("Skipping webhook for rate spider until all spiders complete")
+                self.logger.info(
+                    "Skipping webhook for rate spider until all spiders complete"
+                )
                 # Store payload for later
                 self._rate_payload = payload
                 return
