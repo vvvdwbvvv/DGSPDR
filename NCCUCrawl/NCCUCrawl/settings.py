@@ -1,3 +1,4 @@
+import os
 # Scrapy settings for NCCUCrawl project
 #
 # For simplicity, this file contains only settings considered important or
@@ -52,9 +53,10 @@ DOWNLOAD_DELAY = 0.1
 
 # Enable or disable extensions
 # See https://docs.scrapy.org/en/latest/topics/extensions.html
-# EXTENSIONS = {
-#    "scrapy.extensions.telnet.TelnetConsole": None,
-# }
+EXTENSIONS = {
+    "scrapy.extensions.telnet.TelnetConsole": None,
+    "NCCUCrawl.otel.ObservabilityExtension": 10,
+}
 
 # Configure item pipelines
 # See https://docs.scrapy.org/en/latest/topics/item-pipeline.html
@@ -86,3 +88,5 @@ AUTOTHROTTLE_ENABLED = True
 
 # Set settings whose default value is deprecated to a future-proof value
 FEED_EXPORT_ENCODING = "utf-8"
+DDISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL", "")
+OBS_SERVICE_NAME = "DGSPDR"

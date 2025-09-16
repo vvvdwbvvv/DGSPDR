@@ -4,6 +4,7 @@
 # https://docs.scrapy.org/en/latest/topics/spider-middleware.html
 
 from scrapy import signals
+import time
 
 # useful for handling different item types with a single interface
 
@@ -97,3 +98,28 @@ class NccucrawlDownloaderMiddleware:
 
     def spider_opened(self, spider):
         spider.logger.info("Spider opened: %s" % spider.name)
+
+
+class MetricsMiddleware:
+    # Using otel metrics to record response time
+    @classmethod
+    def from_crawler(cls, crawler):
+        middleware = cls()
+        crawler.signals.connect(middleware.spider_opened, signal=signals.spider_opened)
+        crawler.signals.connect(
+            middleware.response_received, signal=signals.response_received
+        )
+        return middleware
+
+    def spider_opened(self, spider):
+        self.start_time = time.time()
+        self.request_counts = {"success": 0, "failed": 0, "retry": 0}
+
+    def response_received(self, response, request, spider):
+        latency = response.meta.get("download_latency", 0)
+
+        if hasattr(spider, "otel_metrics"):
+            spider.otel_metrics["response_time"].record(
+                latency,
+                {"endpoint": request.url.split("/")[3], "status": response.status},
+            )
