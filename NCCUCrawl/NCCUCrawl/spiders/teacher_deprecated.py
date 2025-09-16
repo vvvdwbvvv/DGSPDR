@@ -18,6 +18,7 @@ def mask_token(text: str) -> str:
     t = re.sub(r"(/tracing/[CU]/zh-TW/\d+-)([^/\s]+)", r"\1***MASKED***", t)
     return t
 
+
 class TeacherSpider(scrapy.Spider):
     name = "teacher_legacy"
     custom_settings = {
@@ -66,21 +67,28 @@ class TeacherSpider(scrapy.Spider):
         try:
             cur = self.conn.cursor()
             # Query all subNum where course id starts with year_sem
-            cur.execute("""
+            cur.execute(
+                """
                         SELECT DISTINCT subNum
                         FROM COURSE
                         WHERE id LIKE ? || '%'
                           AND subNum IS NOT NULL
-                        """, (year_sem,))
+                        """,
+                (year_sem,),
+            )
 
             rows = cur.fetchall()
             result = [str(r[0]) for r in rows if r and r[0]]
 
-            self.logger.info("Loaded %d course ids for year_sem %s", len(result), year_sem)
+            self.logger.info(
+                "Loaded %d course ids for year_sem %s", len(result), year_sem
+            )
             return result
 
         except Exception as e:
-            self.logger.warning("Failed to load course ids from db: %s", mask_token(str(e)))
+            self.logger.warning(
+                "Failed to load course ids from db: %s", mask_token(str(e))
+            )
             return []
 
     # --- batch helper ---

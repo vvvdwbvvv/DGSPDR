@@ -3,6 +3,7 @@ import os
 import json
 import shutil
 import subprocess
+import logging
 from .auth import Authenticate
 from .config import Config
 
@@ -133,10 +134,11 @@ class CourseTracker:
 
         except ValueError as ve:
             logging.warning(
-                f"add skip {track_id}: Add track failed: {track_id} - Invalid procid '{proc_id}': {str(ve)}")
+                f"add skip {course_id}: Add track failed: {course_id} - Invalid procid '{proc_id}': {str(ve)}"
+            )
             return False
         except Exception as e:
-            logging.error(f"add skip {track_id}: Unexpected error: {str(e)}")
+            logging.error(f"add skip {course_id}: Unexpected error: {str(e)}")
             return False
 
     def delete_track(self, course_id: str) -> None:
