@@ -280,7 +280,7 @@ class ObservabilityExtension:
             stats=all_metrics,
             mentions=self.mentions,
             extra_fields=extra_fields if extra_fields else None,
-            # color=0x2ECC71 if reason == "finished" else 0xE74C3C,
+            color=0x2ECC71 if reason == "finished" else 0xE74C3C,
         )
 
         if not self.webhook_url:
