@@ -1,4 +1,4 @@
-.PHONY: checkstyle course courses_legacy courses_complete_it courses_export_upsert teacher test_all 
+.PHONY: checkstyle course courses_legacy courses_complete_it courses_export_upsert teacher test_teacher test_all
 # run the below script to format
 # sed -i '' 's/^    /\t/g' makefile
 
@@ -36,6 +36,10 @@ teacher:
 test_all:
 	cd NCCUCrawl && \
 	python3 -m pytest -v -rP
+
+test_teacher:
+	cd NCCUCrawl/NCCUCrawl && \
+	python3 -m pytest test/spiders/test_teacher_deprecated.py -v -rP
 
 test_login:
 	cd NCCUCrawl && \
