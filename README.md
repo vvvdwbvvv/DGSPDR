@@ -58,6 +58,66 @@ make courses_complete_it
 make courses_export_upsert
 ```
 
+### Prefect daily schedule
+
+This repo includes a Prefect flow that runs a Makefile scraper target on a daily schedule.
+The default target is `courses_complete_it`, which can be overridden at deployment time.
+For on-premise deployments, use a local Prefect server and a process work pool.
+
+```bash
+pip install -r requirements.txt
+pip install prefect
+
+python prefect_flows/daily_scrape.py
+```
+
+To customize the schedule or target:
+
+```bash
+python - <<'PY'
+from prefect_flows.daily_scrape import build_daily_deployment
+
+deployment = build_daily_deployment(
+    cron="0 3 * * *",  # 03:00 UTC daily
+    timezone="UTC",
+    target="courses_complete_it",
+)
+deployment.apply()
+PY
+```
+
+#### On-premise deployment (local Prefect server)
+
+```bash
+prefect server start
+```
+
+In a new terminal:
+
+```bash
+prefect config set PREFECT_API_URL=http://127.0.0.1:4200/api
+prefect work-pool create --type process on-prem-pool
+prefect worker start --pool on-prem-pool
+```
+
+Apply the deployment to the on-prem pool:
+
+```bash
+python - <<'PY'
+from prefect_flows.daily_scrape import build_daily_deployment
+
+deployment = build_daily_deployment(
+    cron="0 2 * * *",
+    timezone="UTC",
+    target="courses_complete_it",
+    work_pool_name="on-prem-pool",
+)
+deployment.apply()
+PY
+```
+
+To validate the flow without running the scraper, pass `dry_run=True`.
+
 
 ### Hierarchical search
 
