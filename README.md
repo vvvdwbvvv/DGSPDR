@@ -133,3 +133,22 @@ python -m pytest NCCUCrawl/test/spiders/test_courses_deprecated.py -v
 ```bash
 make checkstyle
 ```
+
+## Prefect daily schedule
+
+This repository includes a Prefect flow that runs the `make courses` scraper daily.
+
+### Create the deployment
+```bash
+pip install -r requirements.txt
+pip install prefect
+python prefect_schedule.py
+```
+
+### Run manually (optional)
+```bash
+prefect deployment run dgspdr-daily-scraper/daily-scraper
+```
+
+To target a different scraper, pass a different `make_target` when building the
+deployment (e.g., `"courses_complete_it"`).

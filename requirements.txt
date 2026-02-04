@@ -4,3 +4,4 @@ beautifulsoup4
 python-dotenv
 toml
 pyDes
+prefect>=2.14.0
